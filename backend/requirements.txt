@@ -1,0 +1,8 @@
+slowapi
+fastapi
+argon2-cffi
+PyJWT[crypto]
+sqlalchemy>=2.0
+psycopg2-binary
+uvicorn[standard]
+pydantic-settings
