@@ -15,4 +15,4 @@ USER app
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python cfs-app.py create-db && python cfs-app.py run-app"]
+CMD ["sh", "-c", "python cfs-app.py migrate-db && python cfs-app.py run-app"]

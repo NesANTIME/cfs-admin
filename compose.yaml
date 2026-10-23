@@ -8,6 +8,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql
+    networks:
+      - cfs
     healthcheck:
       test:
         [
@@ -23,10 +25,14 @@ services:
     build:
       context: ./backend
       dockerfile: DockerFile
+    env_file:
+      - .env
     environment:
       APP_ENV: production
       HOST_APP: 0.0.0.0
       PORT_APP: 8000
+      # Solo se confía en la IP fija del contenedor web (ver red cfs).
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.28.0.10}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ALGORITHM: HS256
       POSTGRES_HOST: db
@@ -37,6 +43,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - cfs
     restart: unless-stopped
 
   web:
@@ -48,6 +56,15 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    networks:
+      cfs:
+        ipv4_address: 172.28.0.10
 
 volumes:
   postgres_data:
+
+networks:
+  cfs:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

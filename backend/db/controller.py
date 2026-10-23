@@ -1,8 +1,7 @@
-import sys
-from db.template.base import Base
 from typing import Generator
+from pathlib import Path
 from config.config import MountUrlDb, CONFIG
-from sqlalchemy import create_engine, inspect, select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker, Session
 
 
@@ -19,23 +18,17 @@ def getDb() -> Generator[Session, None, None]:
         db.close()
 
 
-def createDb(verificar: bool = True):
-    try:
-        import db.template
-        
-        Base.metadata.create_all(engine)
-        
-        inspector = inspect(engine)
-        tablas_existentes = inspector.get_table_names()
+def migrateDb() -> None:
+    """Aplica todas las migraciones pendientes de Alembic."""
+    from alembic import command
+    from alembic.config import Config as AlembicConfig
 
-        print("[+] Tablas creadas / verificadas exitosamente:")
-        for tabla in tablas_existentes:
-            columnas = [col["name"] for col in inspector.get_columns(tabla)]
-            print(f"    - {tabla}: ({', '.join(columnas)})")
+    raiz = Path(__file__).resolve().parent.parent
+    cfg = AlembicConfig(str(raiz / "alembic.ini"))
+    cfg.set_main_option("script_location", str(raiz / "migrations"))
 
-    except Exception as exc:
-        print(f"[!] Error al crear las tablas en la base de datos: {exc}", file=sys.stderr)
-        raise exc
+    command.upgrade(cfg, "head")
+    print("[+] Base de datos actualizada hasta la última migración.")
 
 
 def createAdmin(usuario: str, nombre: str, password: str) -> None:

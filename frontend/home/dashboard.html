@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CFS-Admin · Panel de monitoreo</title>
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i class="s s1"></i><i class="s s2"></i><i class="s s3"></i></div>
+
+<header class="top">
+  <div class="brand"><span class="mark">CFS</span><b>CFS-Admin</b></div>
+  <div class="actions">
+    <button class="ghost" id="theme" type="button" aria-label="Cambiar tema">Tema</button>
+    <button class="ghost" id="logout" type="button">Salir</button>
+  </div>
+</header>
+
+<main class="wrap" id="panel" hidden>
+  <div class="head">
+    <div>
+      <h1>Panel de monitoreo</h1>
+      <p class="lead" id="updated" role="status" aria-live="polite">Cargando datos…</p>
+    </div>
+    <button class="btn" id="refresh" type="button">Actualizar ahora</button>
+  </div>
+
+  <section class="kpis" aria-label="Resumen">
+    <article class="kpi"><span>Clientes</span><b id="k-total">0</b></article>
+    <article class="kpi ok-k"><span>En línea</span><b id="k-up">0</b></article>
+    <article class="kpi warn-k"><span>Con alertas</span><b id="k-warn">0</b></article>
+    <article class="kpi down-k"><span>Caídos</span><b id="k-down">0</b></article>
+  </section>
+
+  <section class="card panel" aria-label="Estado de clientes">
+    <div class="tools">
+      <input id="q" type="search" placeholder="Buscar cliente o servicio" aria-label="Buscar cliente o servicio">
+      <div class="chips" role="group" aria-label="Filtrar por estado">
+        <button class="chip on" data-f="all" type="button">Todos</button>
+        <button class="chip" data-f="up" type="button">En línea</button>
+        <button class="chip" data-f="warn" type="button">Alertas</button>
+        <button class="chip" data-f="down" type="button">Caídos</button>
+      </div>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Cliente</th><th>Servicio</th><th>Estado</th><th>Latencia</th><th>Últimas lecturas</th><th>Disponibilidad</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="empty" hidden>Ningún cliente coincide con la búsqueda. Cambia el filtro o borra el texto.</p>
+  </section>
+
+  <p class="foot">Los datos son de ejemplo. Conecta tu API en <code>js.js</code> (función <code>cargarDatos</code>).</p>
+</main>
+
+<script type="module" src="js.js"></script>
+</body>
+</html>

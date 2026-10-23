@@ -6,7 +6,17 @@ RUN sed -i \
     && sed -i \
     's/^#LoadModule proxy_http_module/LoadModule proxy_http_module/' \
     /usr/local/apache2/conf/httpd.conf \
-    && printf '\nServerName localhost\nProxyPass /api/ http://api:8000/\nProxyPassReverse /api/ http://api:8000/\n' \
+    && sed -i \
+    's/^#LoadModule headers_module/LoadModule headers_module/' \
+    /usr/local/apache2/conf/httpd.conf \
+    && printf '%s\n' \
+    '' \
+    'ServerName localhost' \
+    '# Reemplaza cualquier X-Forwarded-For enviado por el cliente.' \
+    'RequestHeader set X-Forwarded-For "%{REMOTE_ADDR}s"' \
+    'ProxyAddHeaders On' \
+    'ProxyPass /api/ http://api:8000/' \
+    'ProxyPassReverse /api/ http://api:8000/' \
     >> /usr/local/apache2/conf/httpd.conf
 
 COPY frontend/ /usr/local/apache2/htdocs/

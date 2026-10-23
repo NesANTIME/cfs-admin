@@ -1,5 +1,6 @@
 slowapi
 fastapi
+alembic
 argon2-cffi
 PyJWT[crypto]
 sqlalchemy>=2.0
