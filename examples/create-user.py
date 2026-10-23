@@ -1,24 +1,4 @@
 #!/usr/bin/env python3
-"""Crea un usuario de aplicación en la base de datos de CFS-Admin.
-
-El script pide las credenciales de PostgreSQL y los datos del nuevo usuario,
-genera el hash Argon2 de la contraseña e inserta el empleado en la tabla
-`empleados`.
-
-Uso recomendado:
-    ./examples/crear_usuario.py
-
-Si no existe `backend/venv`, también puede ejecutarse dentro del contenedor
-`api`:
-
-    docker compose run --rm -v "$PWD/examples:/examples:ro" api \
-        python /examples/crear_usuario.py
-
-Nota: crea un empleado básico (tipo "empleado"). Para un administrador
-(tipo "tecnico_jefe") usa:
-
-    docker compose exec api python cfs-app.py create-admin
-"""
 
 from __future__ import annotations
 
@@ -35,10 +15,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _asegurar_dependencias() -> None:
-    """Reejecuta el script con el venv del backend si faltan dependencias."""
     try:
-        import argon2  # noqa: F401
-        import psycopg2  # noqa: F401
+        import argon2 
+        import psycopg2
         return
     except ImportError:
         pass
@@ -64,8 +43,8 @@ def _asegurar_dependencias() -> None:
 
 _asegurar_dependencias()
 
-import psycopg2  # noqa: E402
-from argon2 import PasswordHasher  # noqa: E402
+import psycopg2 
+from argon2 import PasswordHasher  
 
 HASHER = PasswordHasher()
 
@@ -75,7 +54,6 @@ class ErrorCreacionUsuario(Exception):
 
 
 def valor_env(clave: str) -> str | None:
-    """Lee una variable del entorno o del archivo .env de la raíz."""
     if clave in os.environ:
         return os.environ[clave]
 
@@ -98,7 +76,6 @@ def valor_env(clave: str) -> str | None:
 
 
 def ip_contenedor_db() -> str | None:
-    """Obtiene la IP del contenedor db de Compose, si está disponible."""
     if not shutil.which("docker"):
         return None
 
@@ -147,7 +124,6 @@ def ip_contenedor_db() -> str | None:
 
 
 def host_por_defecto() -> str:
-    """Elige un host alcanzable según se ejecute en el host o en un contenedor."""
     host_entorno = os.environ.get("POSTGRES_HOST")
 
     if Path("/.dockerenv").exists():
@@ -164,8 +140,6 @@ def host_por_defecto() -> str:
     if host_entorno and host_entorno not in ("localhost", "127.0.0.1", "db"):
         return host_entorno
 
-    # En el host, Compose no publica el puerto de PostgreSQL. Se usa la IP
-    # del contenedor db para conectar con psycopg2 sin modificar compose.yaml.
     return ip_contenedor_db() or "127.0.0.1"
 
 
@@ -383,7 +357,7 @@ def main() -> int:
         print("\nGenerando hash Argon2... ", end="", flush=True)
         try:
             contrasena_hash = HASHER.hash(contrasena)
-        except Exception as error:  # defensivo: argon2 puede fallar por recursos
+        except Exception as error:
             print("ERROR", flush=True)
             print(
                 f"[!] No se pudo generar el hash de la contraseña: {error}",
