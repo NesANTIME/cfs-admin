@@ -4,12 +4,12 @@ from db.controller import getDb
 from core.limiter import limiter
 from config.config import CONFIG, ConfigBloq
 from sqlalchemy.orm import Session
-from core.deps import getCurrentUser
+from core.deps import getCurrentUser, esAdminAltoRango, obtenerTipoAdmin
 from sqlalchemy import select, update
 from db.template.refresh_token import RefreshToken
 from datetime import datetime, timedelta, timezone
 from db.template.empleado import Empleado, UsuarioSede
-from config.request import TokenResponse, LoginRequest, RefreshRequest
+from config.request import TokenResponse, LoginRequest, RefreshRequest, MeResponse
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from core.security import (
     verifyPassword, requireReHash, rehashearPassword, Dummy_hash,
@@ -106,8 +106,18 @@ def _logout(data: RefreshRequest, db: Annotated[Session, Depends(getDb)]):
 
 @router.get('/me')
 def _me(user: Annotated[Empleado, Depends(getCurrentUser)]):
+    tipo_admin = obtenerTipoAdmin(user)
     return {
-        "id": user.id_empleado, "nombre": user.nombre, "usuario": user.usuario,
-        "tipo": user.tipo, "rol": user.rol.nombre,
+        "id": user.id_empleado,
+        "nombre": user.nombre,
+        "usuario": user.usuario,
+        "tipo": user.tipo,
+        "rol": user.rol.nombre if user.rol else "Sin rol",
+        "tipo_admin": tipo_admin,
+        "nivel_acceso": getattr(user, "nivel_acceso", None),
+        "id_sede": getattr(user, "id_sede", None),
+        "es_admin": tipo_admin in ("admin-g", "admin-s"),
+        "es_admin_g": tipo_admin == "admin-g",
+        "es_admin_s": tipo_admin == "admin-s",
         "direccion": user.direccion if isinstance(user, UsuarioSede) else None,
     }

@@ -177,18 +177,16 @@ En la configuración Compose actual, la API usa el entorno de producción implí
 
 El puerto `8000` de la API no se publica directamente en el host en el Compose actual; el navegador llega a ella a través de Apache en el servicio `web`.
 
-### Crear un usuario desde la terminal
+### Usuario administrador predeterminado
 
-El script `examples/crear_usuario.py` pide las credenciales de PostgreSQL y los datos del nuevo usuario, genera el hash Argon2 e inserta el empleado en la base de datos. Ejecútalo desde la raíz:
+Al iniciar la base de datos y la API, se crea o sincroniza automáticamente el usuario administrador predeterminado con acceso completo y rol de rango más alto:
+
+- **Usuario:** `admin`
+- **Contraseña:** `admincfs`
+- **Rol:** `Administrador` (`tecnico_jefe`, nivel de acceso 5)
+
+Si necesitas crear otro administrador manualmente, puedes ejecutar:
 
 ```bash
-./examples/crear_usuario.py
+docker compose exec api python cfs-app.py create-admin
 ```
-
-Si no tienes el entorno virtual `backend/venv`, puedes ejecutarlo dentro del contenedor `api`:
-
-```bash
-docker compose run --rm -v "$PWD/examples:/examples:ro" api python /examples/crear_usuario.py
-```
-
-Por defecto crea un usuario de tipo `empleado` con rol `Usuario`. Para crear un administrador (`tecnico_jefe`) usa `docker compose exec api python cfs-app.py create-admin`.

@@ -126,7 +126,7 @@ form.addEventListener("submit", async (e) => {
     status.className = "msg ok";
     status.textContent = "Sesión iniciada correctamente.";
 
-    window.location.assign("home/dashboard.html");
+    window.location.assign("home/index.html");
 
   } catch (error) {
     console.error("Error en el inicio de sesión:", error);

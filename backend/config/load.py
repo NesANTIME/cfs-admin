@@ -17,7 +17,7 @@ class Configuration(BaseSettings):
     jwt_refresh_token_expire_days: int = 7
 
     cors_allow_origins: list[str] = ["http://localhost:8080"]
-    cors_allow_methods: list[str] = ["GET", "POST", "OPTIONS"]
+    cors_allow_methods: list[str] = ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
     cors_allow_headers: list[str] = ["Content-Type", "Authorization"]
     cors_allow_credentials: bool = False
 

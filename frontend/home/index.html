@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CFS-Admin · Panel Principal</title>
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i class="s s1"></i><i class="s s2"></i><i class="s s3"></i></div>
+
+<header class="top">
+  <div class="brand"><span class="mark">CFS</span><b>CFS-Admin</b></div>
+  <div class="user-info" id="user-badge" hidden>
+    <span class="user-name" id="user-name"></span>
+    <span class="user-tag" id="user-role"></span>
+  </div>
+  <div class="actions">
+    <button class="ghost" id="theme" type="button" aria-label="Cambiar tema">Tema</button>
+    <button class="ghost" id="logout" type="button">Salir</button>
+  </div>
+</header>
+
+<main class="wrap" id="panel" hidden>
+  <div class="head">
+    <div>
+      <h1>Panel Principal · Sedes</h1>
+      <p class="lead" id="panel-sub">Sedes disponibles según tu nivel de acceso</p>
+    </div>
+    <div class="head-actions">
+      <button class="ghost" id="refresh-sedes" type="button">Actualizar</button>
+      <button class="btn" id="btn-nueva-sede" type="button" hidden>➕ Crear nueva sede</button>
+    </div>
+  </div>
+
+  <!-- Barra de herramientas y filtros -->
+  <div class="tools" id="tools-bar">
+    <input id="q-sedes" type="search" placeholder="Buscar sede por nombre, ubicación o descripción…" aria-label="Buscar sede">
+    <span class="pill up" id="badge-sedes-count">0 sedes disponibles</span>
+  </div>
+
+  <!-- Estado vacío cuando no hay sedes (para admin-g pide registrar una) -->
+  <div class="empty-state card" id="empty-sedes-box" hidden>
+    <div class="empty-icon">🏢</div>
+    <h2>No hay sedes registradas todavía</h2>
+    <p id="empty-sedes-msg">Actualmente no existen sedes en el sistema. Registra una nueva sede para comenzar a gestionar sus dispositivos y enlaces de red.</p>
+    <button class="btn" id="btn-empty-crear-sede" type="button" hidden>➕ Registrar primera sede</button>
+  </div>
+
+  <!-- Cuadrícula interactiva de sedes disponibles -->
+  <section class="sedes-grid" id="grid-sedes" aria-label="Listado de sedes disponibles"></section>
+</main>
+
+<!-- Modal: Crear nueva sede (exclusivo admin-g) -->
+<div class="modal-backdrop" id="modal-crear-sede" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-sede">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="titulo-modal-sede">Crear Nueva Sede</h2>
+      <button class="modal-close" id="btn-cerrar-modal" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <p class="modal-sub">Ingresa el nombre, ubicación y una descripción detallada de la nueva sede.</p>
+    
+    <form id="form-sede" novalidate>
+      <div class="form-group">
+        <label for="sede-nombre">Nombre de la sede <span class="req">*</span></label>
+        <input type="text" id="sede-nombre" name="nombre" placeholder="Ej: Sede Central Norte" required autocomplete="off" maxlength="100">
+      </div>
+
+      <div class="form-group">
+        <label for="sede-ubicacion">Ubicación <span class="req">*</span></label>
+        <input type="text" id="sede-ubicacion" name="ubicacion" placeholder="Ej: Av. Caracas # 45-67, Bogotá" required autocomplete="off" maxlength="255">
+      </div>
+
+      <div class="form-group">
+        <label for="sede-descripcion">Descripción <span class="req">*</span></label>
+        <textarea id="sede-descripcion" name="descripcion" rows="3" placeholder="Ej: Centro de operaciones y monitoreo de enlaces troncales." required maxlength="1000"></textarea>
+      </div>
+
+      <div class="form-msg" id="msg-crear-sede" role="alert" hidden></div>
+
+      <div class="modal-actions">
+        <button class="ghost" id="btn-cancelar-sede" type="button">Cancelar</button>
+        <button class="btn" id="btn-submit-sede" type="submit">Guardar sede</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="module" src="panel.js"></script>
+</body>
+</html>

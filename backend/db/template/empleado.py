@@ -1,13 +1,14 @@
 from datetime import datetime
 from .base import Base
 from typing import TYPE_CHECKING
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if (TYPE_CHECKING):
     from .rol import Rol
     from .sede import Sede
     from .servicio_red import ServicioRed
+    from .servicio_usuario import ServicioUsuario
 
 
 
@@ -23,10 +24,16 @@ class Empleado(Base):
     activo: Mapped[bool] = mapped_column(default = True, server_default = "true")
     intentos_fallidos: Mapped[int] = mapped_column(default = 0, server_default = "0")
     bloqueado_hasta: Mapped[datetime | None] = mapped_column(DateTime(timezone = True))
+    en_linea: Mapped[bool] = mapped_column(Boolean(), default=False, server_default="false")
+    ultima_vez_en_linea: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
     id_rol: Mapped[int] = mapped_column(ForeignKey("roles.id_rol", ondelete = "RESTRICT"))
     rol: Mapped["Rol"] = relationship(back_populates = "empleados")
+
+    servicios_usuario: Mapped[list["ServicioUsuario"]] = relationship(
+        back_populates="empleado", cascade="all, delete-orphan"
+    )
 
     __mapper_args__ = {"polymorphic_on": "tipo", "polymorphic_identity": "empleado"}
     __table_args__ = (

@@ -3,14 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CFS-Admin · Panel de monitoreo</title>
+<title>CFS-Admin · Detalle de Sede</title>
 <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><i class="s s1"></i><i class="s s2"></i><i class="s s3"></i></div>
 
 <header class="top">
-  <div class="brand"><span class="mark">CFS</span><b>CFS-Admin</b></div>
+  <div class="top-nav-left">
+    <a class="ghost btn-back" id="btn-volver" href="index.html" aria-label="Volver a las sedes">← Volver a Sedes</a>
+    <div class="brand"><span class="mark">CFS</span><b>CFS-Admin</b></div>
+  </div>
+  <div class="user-info" id="user-badge" hidden>
+    <span class="user-name" id="user-name"></span>
+    <span class="user-tag" id="user-role"></span>
+  </div>
   <div class="actions">
     <button class="ghost" id="theme" type="button" aria-label="Cambiar tema">Tema</button>
     <button class="ghost" id="logout" type="button">Salir</button>
@@ -18,24 +25,102 @@
 </header>
 
 <main class="wrap" id="panel" hidden>
-  <div class="head">
-    <div>
-      <h1>Panel de monitoreo</h1>
-      <p class="lead" id="updated" role="status" aria-live="polite">Cargando datos…</p>
-    </div>
-    <button class="btn" id="refresh" type="button">Actualizar ahora</button>
-  </div>
 
-  <section class="kpis" aria-label="Resumen">
-    <article class="kpi"><span>Clientes</span><b id="k-total">0</b></article>
-    <article class="kpi ok-k"><span>En línea</span><b id="k-up">0</b></article>
-    <article class="kpi warn-k"><span>Con alertas</span><b id="k-warn">0</b></article>
-    <article class="kpi down-k"><span>Caídos</span><b id="k-down">0</b></article>
+  <!-- Banner con la información específica de la sede -->
+  <section class="sede-banner card" aria-label="Información de la sede">
+    <div class="sede-banner-content">
+      <div class="sede-badge-row">
+        <span class="sede-id-tag" id="sede-id-tag">Sede #…</span>
+        <span class="pill up" id="sede-estado-pill">Sede Activa</span>
+      </div>
+      <h1 id="sede-nombre-titulo">Cargando sede…</h1>
+      <p class="lead" id="sede-ubicacion-lead">📍 Ubicación</p>
+      <p class="sede-desc-text" id="sede-descripcion-texto">Cargando descripción…</p>
+    </div>
+    <div class="sede-banner-actions">
+      <button class="btn" id="refresh-sede" type="button">Actualizar sede</button>
+    </div>
   </section>
 
-  <section class="card panel" aria-label="Estado de clientes">
+  <!-- Métricas de la sede -->
+  <section class="kpis" aria-label="Métricas de la sede">
+    <article class="kpi"><span>Dispositivos</span><b id="k-disp-total">0</b></article>
+    <article class="kpi ok-k"><span>En línea</span><b id="k-disp-up">0</b></article>
+    <article class="kpi warn-k"><span>Alertas</span><b id="k-disp-warn">0</b></article>
+    <article class="kpi down-k"><span>Fuera de línea</span><b id="k-disp-down">0</b></article>
+  </section>
+
+  <!-- Sección 0: Usuarios/Clientes de la Sede con control de servicios -->
+  <section class="card panel" aria-label="Usuarios y servicios de la sede">
+    <div class="panel-head-row">
+      <div>
+        <h2 class="panel-title">👥 Usuarios y Servicios de la Sede</h2>
+        <p class="panel-sub">Estado de conexión y servicios habilitados por usuario</p>
+      </div>
+    </div>
     <div class="tools">
-      <input id="q" type="search" placeholder="Buscar cliente o servicio" aria-label="Buscar cliente o servicio">
+      <input id="q-usuarios" type="search" placeholder="Buscar usuario por nombre o usuario…" aria-label="Buscar usuario">
+      <span class="pill up" id="badge-usuarios-count">0 usuarios</span>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:50px">ID</th>
+            <th>Nombre</th>
+            <th style="width:120px">Usuario</th>
+            <th style="width:100px">Tipo</th>
+            <th style="width:110px">Estado</th>
+            <th style="width:160px">Videoconf.</th>
+            <th style="width:130px">Chat</th>
+          </tr>
+        </thead>
+        <tbody id="rows-usuarios"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="empty-usuarios" hidden>No hay usuarios registrados en esta sede.</p>
+  </section>
+
+  <!-- Sección 1: Equipos y Dispositivos de Red de la Sede -->
+  <section class="card panel" aria-label="Dispositivos de red de la sede">
+    <div class="panel-head-row">
+      <div>
+        <h2 class="panel-title">📡 Dispositivos de Red en esta Sede</h2>
+        <p class="panel-sub">Equipos de comunicación, enrutamiento y seguridad instalados en la sede</p>
+      </div>
+    </div>
+    <div class="tools">
+      <input id="q-disp" type="search" placeholder="Buscar dispositivo por nombre, IP o MAC…" aria-label="Buscar dispositivo">
+      <span class="pill up" id="badge-disp-count">0 dispositivos</span>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 70px;">ID</th>
+            <th>Nombre del Dispositivo</th>
+            <th style="width: 140px;">Tipo</th>
+            <th style="width: 160px;">Dirección IP</th>
+            <th style="width: 180px;">Dirección MAC</th>
+            <th style="width: 140px;">Estado</th>
+          </tr>
+        </thead>
+        <tbody id="rows-dispositivos"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="empty-dispositivos" hidden>No hay dispositivos registrados en esta sede todavía.</p>
+  </section>
+
+  <!-- Sección 2: Monitoreo de Servicios de Red en la Sede -->
+  <section class="card panel" aria-label="Monitoreo de servicios de red">
+    <div class="panel-head-row">
+      <div>
+        <h2 class="panel-title">📊 Monitoreo de Enlaces y Servicios de la Sede</h2>
+        <p class="panel-sub">Latencia, disponibilidad y estado de los servicios que transitan por esta sede</p>
+      </div>
+    </div>
+    <div class="tools">
+      <input id="q-servicios" type="search" placeholder="Buscar servicio o cliente…" aria-label="Buscar servicio">
       <div class="chips" role="group" aria-label="Filtrar por estado">
         <button class="chip on" data-f="all" type="button">Todos</button>
         <button class="chip" data-f="up" type="button">En línea</button>
@@ -45,14 +130,22 @@
     </div>
     <div class="scroll">
       <table>
-        <thead><tr><th>Cliente</th><th>Servicio</th><th>Estado</th><th>Latencia</th><th>Últimas lecturas</th><th>Disponibilidad</th></tr></thead>
-        <tbody id="rows"></tbody>
+        <thead>
+          <tr>
+            <th>Cliente / Enlace</th>
+            <th>Servicio</th>
+            <th>Estado</th>
+            <th>Latencia</th>
+            <th>Últimas lecturas</th>
+            <th>Disponibilidad</th>
+          </tr>
+        </thead>
+        <tbody id="rows-servicios"></tbody>
       </table>
     </div>
-    <p class="empty" id="empty" hidden>Ningún cliente coincide con la búsqueda. Cambia el filtro o borra el texto.</p>
+    <p class="empty" id="empty-servicios" hidden>Ningún servicio coincide con la búsqueda.</p>
   </section>
 
-  <p class="foot">Los datos son de ejemplo. Conecta tu API en <code>js.js</code> (función <code>cargarDatos</code>).</p>
 </main>
 
 <script type="module" src="js.js"></script>

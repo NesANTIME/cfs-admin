@@ -19,6 +19,7 @@ def main():
     subparser.add_parser("migrate-db", help = "Aplicar las migraciones de Alembic")
     subparser.add_parser("create-db", help = "Alias histórico de migrate-db")
     subparser.add_parser("create-admin", help = "Crear el administrador inicial")
+    subparser.add_parser("seed-admin", help = "Crear o verificar el administrador predeterminado (admin/admincfs)")
 
     args = parser.parse_args()
 
@@ -53,6 +54,10 @@ def main():
             raise SystemExit("[!] Las contraseñas no coinciden.")
 
         createAdmin(usuario, nombre, password)
+
+    elif (args.accion == "seed-admin"):
+        from db.controller import asegurarAdminPredeterminado
+        asegurarAdminPredeterminado()
 
     else:
         sys.exit(1)

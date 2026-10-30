@@ -1,1 +1,1 @@
-from . import base, rol, sede, empleado, servicio_red, dispositivo_red, refresh_token 
+from . import base, rol, sede, empleado, servicio_red, dispositivo_red, refresh_token, servicio_usuario
