@@ -327,6 +327,111 @@ $("#theme").addEventListener("click", () => {
 });
 
 /* Eventos */
+/* Modal cambiar contraseña */
+function abrirModalCambiarPass() {
+  const modal = $("#modal-cambiar-pass");
+  const msg = $("#msg-cambiar-pass");
+  const form = $("#form-cambiar-pass");
+  if (form) form.reset();
+  if (msg) {
+    msg.hidden = true;
+    msg.style.display = "none";
+    msg.className = "form-msg";
+    msg.textContent = "";
+  }
+  if (modal) {
+    modal.removeAttribute("hidden");
+    modal.style.display = "grid";
+  }
+  setTimeout(() => {
+    const input = $("#pass-actual");
+    if (input) input.focus();
+  }, 50);
+}
+
+function cerrarModalCambiarPass() {
+  const modal = $("#modal-cambiar-pass");
+  if (!modal) return;
+  modal.setAttribute("hidden", "");
+  modal.style.display = "none";
+}
+
+async function cambiarPassword(e) {
+  e.preventDefault();
+  const actual = $("#pass-actual").value;
+  const nueva = $("#pass-nueva").value;
+  const confirmar = $("#pass-confirmar").value;
+  const msg = $("#msg-cambiar-pass");
+  const submitBtn = $("#btn-submit-pass");
+
+  if (!actual || !nueva || !confirmar) {
+    msg.className = "form-msg error";
+    msg.textContent = "Todos los campos de contraseña son requeridos.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  if (nueva.length < 8) {
+    msg.className = "form-msg error";
+    msg.textContent = "La nueva contraseña debe tener al menos 8 caracteres.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  if (nueva !== confirmar) {
+    msg.className = "form-msg error";
+    msg.textContent = "La confirmación de la contraseña no coincide.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Actualizando…";
+  msg.hidden = true;
+  msg.style.display = "none";
+
+  try {
+    const respuesta = await apiFetch("/me/password", {
+      method: "POST",
+      body: JSON.stringify({ contrasena_actual: actual, contrasena_nueva: nueva }),
+    });
+
+    if (respuesta && respuesta.ok) {
+      msg.className = "form-msg success";
+      msg.textContent = "¡Contraseña actualizada exitosamente!";
+      msg.hidden = false;
+      msg.style.display = "block";
+      setTimeout(() => {
+        cerrarModalCambiarPass();
+      }, 1200);
+    } else {
+      const err = await (respuesta ? respuesta.json().catch(() => ({})) : {});
+      msg.className = "form-msg error";
+      msg.textContent = err.detail || "Error al cambiar contraseña.";
+      msg.hidden = false;
+      msg.style.display = "block";
+    }
+  } catch (err) {
+    msg.className = "form-msg error";
+    msg.textContent = "Error al conectar con el servidor.";
+    msg.hidden = false;
+    msg.style.display = "block";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Actualizar contraseña";
+  }
+}
+
+async function enviarHeartbeat() {
+  try {
+    await apiFetch("/heartbeat", { method: "POST" });
+  } catch (e) { /* no-op */ }
+}
+
+/* Eventos */
 $("#logout").addEventListener("click", cerrarSesion);
 $("#refresh-sedes").addEventListener("click", cargarSedes);
 $("#btn-nueva-sede").addEventListener("click", abrirModalCrearSede);
@@ -334,6 +439,16 @@ $("#btn-empty-crear-sede").addEventListener("click", abrirModalCrearSede);
 $("#btn-cerrar-modal").addEventListener("click", cerrarModalCrearSede);
 $("#btn-cancelar-sede").addEventListener("click", cerrarModalCrearSede);
 $("#form-sede").addEventListener("submit", guardarSede);
+
+const btnCambiarPass = $("#btn-cambiar-pass");
+if (btnCambiarPass) btnCambiarPass.addEventListener("click", abrirModalCambiarPass);
+const btnCerrarPass = $("#btn-cerrar-modal-pass");
+if (btnCerrarPass) btnCerrarPass.addEventListener("click", cerrarModalCambiarPass);
+const btnCancPass = $("#btn-cancelar-pass");
+if (btnCancPass) btnCancPass.addEventListener("click", cerrarModalCambiarPass);
+const formPass = $("#form-cambiar-pass");
+if (formPass) formPass.addEventListener("submit", cambiarPassword);
+
 $("#q-sedes").addEventListener("input", (e) => {
   state.filtroTexto = e.target.value;
   renderSedes();
@@ -342,13 +457,19 @@ $("#q-sedes").addEventListener("input", (e) => {
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     cerrarModalCrearSede();
+    cerrarModalCambiarPass();
   }
 });
 $("#modal-crear-sede").addEventListener("click", (e) => {
-  if (e.target === $("#modal-crear-sede")) {
-    cerrarModalCrearSede();
-  }
+  if (e.target === $("#modal-crear-sede")) cerrarModalCrearSede();
 });
+const modalPass = $("#modal-cambiar-pass");
+if (modalPass) {
+  modalPass.addEventListener("click", (e) => {
+    if (e.target === modalPass) cerrarModalCambiarPass();
+  });
+}
+
 
 /* ---- Arranque ---- */
 async function iniciar() {
@@ -386,6 +507,9 @@ async function iniciar() {
   $("#panel").hidden = false;
 
   await cargarSedes();
+  enviarHeartbeat();
+  setInterval(enviarHeartbeat, 30000);
 }
 
 iniciar();
+

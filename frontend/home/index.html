@@ -16,10 +16,12 @@
     <span class="user-tag" id="user-role"></span>
   </div>
   <div class="actions">
+    <button class="ghost" id="btn-cambiar-pass" type="button" aria-label="Cambiar contraseña">🔑 Contraseña</button>
     <button class="ghost" id="theme" type="button" aria-label="Cambiar tema">Tema</button>
     <button class="ghost" id="logout" type="button">Salir</button>
   </div>
 </header>
+
 
 <main class="wrap" id="panel" hidden>
   <div class="head">
@@ -86,6 +88,42 @@
   </div>
 </div>
 
+<!-- Modal: Cambiar Contraseña Segura -->
+<div class="modal-backdrop" id="modal-cambiar-pass" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-pass">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="titulo-modal-pass">Cambiar Contraseña</h2>
+      <button class="modal-close" id="btn-cerrar-modal-pass" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <p class="modal-sub">Ingresa tu contraseña actual y la nueva contraseña (mínimo 8 caracteres).</p>
+    
+    <form id="form-cambiar-pass" novalidate>
+      <div class="form-group">
+        <label for="pass-actual">Contraseña actual <span class="req">*</span></label>
+        <input type="password" id="pass-actual" required autocomplete="current-password">
+      </div>
+
+      <div class="form-group">
+        <label for="pass-nueva">Nueva contraseña <span class="req">*</span></label>
+        <input type="password" id="pass-nueva" required autocomplete="new-password" minlength="8">
+      </div>
+
+      <div class="form-group">
+        <label for="pass-confirmar">Confirmar nueva contraseña <span class="req">*</span></label>
+        <input type="password" id="pass-confirmar" required autocomplete="new-password" minlength="8">
+      </div>
+
+      <div class="form-msg" id="msg-cambiar-pass" role="alert" hidden></div>
+
+      <div class="modal-actions">
+        <button class="ghost" id="btn-cancelar-pass" type="button">Cancelar</button>
+        <button class="btn" id="btn-submit-pass" type="submit">Actualizar contraseña</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script type="module" src="panel.js"></script>
+
 </body>
 </html>

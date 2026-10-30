@@ -68,53 +68,43 @@ def _listarUsuariosSede(
             detail=f"La sede con ID {id_sede} no existe.",
         )
 
-    # Obtener todos los UsuarioSede cuyo Tecnico asignado corresponde a esta sede
-    # En la arquitectura actual, los UsuarioSede no tienen id_sede propio.
-    # Se buscan a través de los ServicioUsuario que tienen id_sede, o bien se listan
-    # todos los UsuarioSede que tengan servicios en esa sede, o que no tengan servicios
-    # pero puedan ser asociados.
-    # Para simplificar y ser consistentes, listamos:
-    # 1. Todos los UsuarioSede que tengan algún ServicioUsuario con id_sede = id_sede
-    # 2. Los Tecnicos (no jefes) asignados a esa sede
-    # NOTA: Como UsuarioSede no tiene id_sede en la tabla, usamos una subconsulta
-    # sobre servicios_usuario. Si un usuario_sede no tiene servicios aún, lo incluimos
-    # consultando por un criterio secundario. En esta implementación listamos TODOS los
-    # UsuarioSede con servicios en esa sede más los que fueron creados con servicios ahí.
-    # Para no excluir usuarios sin servicios, hacemos una consulta más amplia por tipo.
+    # Limpiar presencia vencida antes de listar
+    from api.heartbeat import limpiarPresencia
+    try:
+        limpiarPresencia(db)
+    except Exception:
+        pass
 
-    # Estrategia: obtener empleados de tipo 'usuario_sede' que tengan al menos un
-    # ServicioUsuario con id_sede == id_sede, UNIDO con los que no tienen servicios
-    # pero están relacionados con la sede a través de algún tecnico de esa sede.
-    # Como simplificación pragmática (los UsuarioSede no tienen sede en BD), 
-    # devolvemos todos los UsuarioSede que tengan servicios_usuario en esa sede.
-    # Para usuarios sin servicios, se pueden agregar si lo crea el admin.
-
-    # Consulta: empleados de tipo usuario_sede o tecnico (no jefe) con servicios en la sede
+    # Obtener usuarios vinculados a esta sede
+    # 1. Usuarios con id_sede == id_sede
+    # 2. Usuarios con al menos un registro en servicios_usuario con id_sede == id_sede
+    # Excluyendo administradores generales (tecnico_jefe)
     stmt = (
         select(Empleado)
         .where(
-            Empleado.tipo.in_(["usuario_sede"])
+            Empleado.tipo.in_(["usuario_sede", "tecnico"]),
+            Empleado.activo == True,  # noqa: E712
         )
-        .options(selectinload(Empleado.servicios_usuario))
+        .options(selectinload(Empleado.servicios_usuario), selectinload(Empleado.rol))
     )
     empleados = db.scalars(stmt).all()
 
-    # Filtrar los que tienen al menos un servicio en esta sede, o bien incluir
-    # todos si el admin quiere ver el listado completo. 
-    # Para la primera carga mostramos los que tienen servicios en esta sede o los
-    # que fueron asignados a esta sede vía el campo id_sede en servicio_usuario.
     resultado = []
     for emp in empleados:
+        emp_sede = getattr(emp, "id_sede", None)
         servicios_sede = [s for s in emp.servicios_usuario if s.id_sede == id_sede]
-        if servicios_sede or True:  # Incluir todos los usuario_sede para permitir habilitarles
-            # Construir respuesta filtrando solo los servicios de esta sede
+
+        # Incluir si está asignado a la sede o tiene servicios en ella
+        if emp_sede == id_sede or servicios_sede or emp.tipo == "usuario_sede":
             resultado.append({
                 "id_empleado": emp.id_empleado,
                 "nombre": emp.nombre,
                 "usuario": emp.usuario,
                 "tipo": emp.tipo,
                 "activo": emp.activo,
-                "en_linea": False,
+                "en_linea": bool(emp.en_linea),
+                "uid_publico": getattr(emp, "uid_publico", None),
+                "rol": emp.rol.nombre if emp.rol else emp.tipo,
                 "servicios": [
                     {"tipo_servicio": s.tipo_servicio, "habilitado": s.habilitado}
                     for s in emp.servicios_usuario
@@ -123,6 +113,7 @@ def _listarUsuariosSede(
             })
 
     return resultado
+
 
 
 @router.post(

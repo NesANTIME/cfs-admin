@@ -243,75 +243,7 @@ function renderDispositivos() {
   }).join("");
 }
 
-/* ---- Datos de monitoreo simulados para la sede ---- */
-const SERVICIOS_BASE = [
-  ['Troncal Principal', 'Enlace WAN BGP'], ['Enlace de Backup', 'Fibra Óptica Secundaria'],
-  ['VLAN Gestión', 'Switches y Access Points'], ['VLAN Telefonía IP', 'VoIP PBX'],
-  ['Servidor Local', 'Base de datos de sede'], ['Portal Cautivo', 'Wi-Fi Visitantes'],
-  ['VPN Inter-sedes', 'Túnel IPSec'], ['Videovigilancia', 'CCTV IP Sede'],
-].map(([cliente, servicio], i) => ({
-  id: i, cliente, servicio,
-  lecturas: Array.from({ length: 14 }, () => 20 + Math.random() * 80),
-  caido: i === 7, disp: 99.8 - Math.random() * (i === 7 ? 5 : 0.8),
-}));
 
-async function cargarServicios() {
-  SERVICIOS_BASE.forEach((c) => {
-    if (Math.random() < 0.04) c.caido = !c.caido;
-    const base = c.caido ? 0 : 20 + Math.random() * (Math.random() < 0.15 ? 280 : 70);
-    c.lecturas = [...c.lecturas.slice(1), base];
-  });
-  return SERVICIOS_BASE.map((c) => {
-    const lat = c.lecturas[c.lecturas.length - 1];
-    const estado = c.caido ? 'down' : lat > 180 ? 'warn' : 'up';
-    return { ...c, lat, estado };
-  });
-}
-
-function spark(c) {
-  return '<div class="spark" aria-hidden="true">' + c.lecturas.map((v) => {
-    const cls = v === 0 ? 'd' : v > 180 ? 'w' : '';
-    return `<i class="${cls}" style="height:${v === 0 ? 3 : Math.min(26, 5 + v / 10)}px"></i>`;
-  }).join('') + '</div>';
-}
-
-function renderServicios() {
-  const t = state.textoServicios.toLowerCase();
-  const lista = state.servicios.filter((c) =>
-    (state.filtroServicios === 'all' || c.estado === state.filtroServicios) &&
-    (c.cliente + ' ' + c.servicio).toLowerCase().includes(t)
-  );
-
-  const tbody = $('#rows-servicios');
-  const empty = $('#empty-servicios');
-
-  if (lista.length === 0) {
-    tbody.innerHTML = "";
-    empty.hidden = false;
-    return;
-  }
-
-  empty.hidden = true;
-  tbody.innerHTML = lista.map((c) => `
-    <tr>
-      <td class="cli">${esc(c.cliente)}</td>
-      <td>${esc(c.servicio)}</td>
-      <td><span class="pill ${c.estado}">${ETIQUETA_SERV[c.estado]}</span></td>
-      <td class="num">${c.estado === 'down' ? '—' : Math.round(c.lat) + ' ms'}</td>
-      <td>${spark(c)}</td>
-      <td class="num">${c.disp.toFixed(2)} %</td>
-    </tr>
-  `).join('');
-}
-
-async function actualizarServicios() {
-  try {
-    state.servicios = await cargarServicios();
-    renderServicios();
-  } catch (e) {
-    console.error("Error al actualizar servicios:", e);
-  }
-}
 
 /* ---- Usuarios de la Sede y control de servicios ---- */
 
@@ -346,7 +278,7 @@ function renderUsuarios() {
 
   const t = (state.filtroUsuarios || "").toLowerCase();
   const filtrados = state.usuarios.filter((u) =>
-    (u.nombre + " " + u.usuario).toLowerCase().includes(t)
+    (u.nombre + " " + u.usuario + " " + (u.uid_publico || "")).toLowerCase().includes(t)
   );
 
   const nTotal = state.usuarios.length;
@@ -365,7 +297,7 @@ function renderUsuarios() {
   tbody.innerHTML = filtrados.map((u) => {
     const pillEstado = u.en_linea
       ? `<span class="pill up">En línea</span>`
-      : `<span class="pill down">Fuera de línea</span>`;
+      : `<span class="pill down">Desconectado</span>`;
 
     const btnDeshabilitado = _esBtnDeshabilitado(u);
     const disabledAttr = btnDeshabilitado ? " disabled" : "";
@@ -373,19 +305,32 @@ function renderUsuarios() {
     const svcVideo = _obtenerServicio(u, "videoconferencia");
     const videoHabilitado = svcVideo ? svcVideo.habilitado : false;
     const videoClase = videoHabilitado ? "on" : "off";
-    const videoTexto = videoHabilitado ? "Deshabilitar" : "Habilitar";
+    const videoTexto = videoHabilitado ? "Habilitado" : "Deshabilitado";
 
     const svcChat = _obtenerServicio(u, "chat");
     const chatHabilitado = svcChat ? svcChat.habilitado : false;
     const chatClase = chatHabilitado ? "on" : "off";
-    const chatTexto = chatHabilitado ? "Deshabilitar" : "Habilitar";
+    const chatTexto = chatHabilitado ? "Habilitado" : "Deshabilitado";
+
+    const uidCorto = u.uid_publico ? `${u.uid_publico.substring(0, 13)}…` : "—";
+
+    // Etiqueta de rol con clase CSS correcta según tipo
+    let rolTexto, rolClase;
+    if (u.tipo === "tecnico" || u.tipo === "tecnico_jefe") {
+      rolTexto = u.rol || "Admin de Sede";
+      rolClase = "user-tag-admin-s";
+    } else {
+      rolTexto = u.rol || "Usuario Sede";
+      rolClase = "user-tag-user";
+    }
 
     return `
       <tr>
         <td class="num">#${u.id_empleado}</td>
         <td class="cli">${esc(u.nombre)}</td>
         <td class="mono">${esc(u.usuario)}</td>
-        <td>${esc(u.tipo)}</td>
+        <td><span class="${rolClase}">${esc(rolTexto)}</span></td>
+        <td><span class="mono" style="font-size:0.78rem; opacity:0.85" title="${esc(u.uid_publico || '')}">${esc(uidCorto)}</span></td>
         <td>${pillEstado}</td>
         <td>
           <button
@@ -407,11 +352,20 @@ function renderUsuarios() {
             type="button"
           >${chatTexto}</button>
         </td>
+        <td style="text-align:right">
+          <button
+            class="btn-desactivar btn-eliminar-user"
+            data-id="${u.id_empleado}"
+            data-user="${esc(u.usuario)}"
+            type="button"
+            title="Desactivar usuario"
+          >❌ Desactivar</button>
+        </td>
       </tr>
     `;
   }).join("");
 
-  // Delegación de eventos para los botones toggle
+  // Eventos toggle
   tbody.querySelectorAll(".btn-toggle:not([disabled])").forEach((btn) => {
     btn.addEventListener("click", () => {
       const idEmpleado = parseInt(btn.dataset.id, 10);
@@ -420,10 +374,33 @@ function renderUsuarios() {
       toggleServicio(idEmpleado, tipoServicio, habilitado);
     });
   });
+
+  // Eventos desactivar usuario
+  tbody.querySelectorAll(".btn-eliminar-user").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const idEmp = btn.dataset.id;
+      const nomUser = btn.dataset.user;
+      if (!confirm(`¿Estás seguro de que deseas desactivar al usuario '${nomUser}' de esta sede?`)) {
+        return;
+      }
+      try {
+        const resp = await apiFetch(`/sedes/${encodeURIComponent(state.idSede)}/usuarios/${idEmp}`, {
+          method: "DELETE",
+        });
+        if (resp && resp.ok) {
+          await cargarUsuariosSede();
+        } else {
+          const err = await (resp ? resp.json().catch(() => ({})) : {});
+          alert(err.detail || "No se pudo desactivar el usuario.");
+        }
+      } catch (e) {
+        alert("Error al conectar con el servidor.");
+      }
+    });
+  });
 }
 
 async function toggleServicio(idEmpleado, tipoServicio, estaHabilitado) {
-  // Si está habilitado, lo deshabilitamos; si no, lo habilitamos
   const accion = estaHabilitado ? "deshabilitar" : "habilitar";
   try {
     const respuesta = await apiFetch(
@@ -440,19 +417,300 @@ async function toggleServicio(idEmpleado, tipoServicio, estaHabilitado) {
       alert(`Error al ${accion} el servicio: ${err.detail || respuesta.status}`);
       return;
     }
-    // Recargar la lista de usuarios para reflejar el cambio
     await cargarUsuariosSede();
   } catch (e) {
     console.error(`Error al ${accion} servicio '${tipoServicio}' para empleado ${idEmpleado}:`, e);
   }
 }
 
+/* Modal Crear Usuario */
+function abrirModalCrearUsuario() {
+  const modal = $("#modal-crear-usuario");
+  const msg = $("#msg-crear-usuario");
+  const form = $("#form-usuario");
+  if (form) form.reset();
+  if (msg) {
+    msg.hidden = true;
+    msg.style.display = "none";
+    msg.className = "form-msg";
+    msg.textContent = "";
+  }
+
+  // Actualizar banner informativo de sede
+  const sedeLabel = $("#modal-sede-label");
+  if (sedeLabel && state.sedeActual) {
+    sedeLabel.textContent = `Sede #${state.sedeActual.id_sede} — ${state.sedeActual.nombre}`;
+  }
+
+  // Resetear visibilidad de campos
+  const groupDir = $("#group-direccion");
+  const avisoAdminS = $("#aviso-admin-s");
+  if (groupDir) { groupDir.hidden = false; }
+  if (avisoAdminS) { avisoAdminS.hidden = true; }
+
+  // Si el usuario autenticado es admin-s, no puede crear admin-s
+  const optAdminS = $("#opt-admin-s");
+  if (optAdminS) {
+    const esAdminG = state.usuario && state.usuario.tipo_admin === "admin-g";
+    optAdminS.hidden = !esAdminG;
+    optAdminS.disabled = !esAdminG;
+  }
+
+  if (modal) {
+    modal.removeAttribute("hidden");
+    modal.style.display = "grid";
+  }
+  setTimeout(() => {
+    const input = $("#new-user-nombre");
+    if (input) input.focus();
+  }, 50);
+}
+
+function cerrarModalCrearUsuario() {
+  const modal = $("#modal-crear-usuario");
+  if (!modal) return;
+  modal.setAttribute("hidden", "");
+  modal.style.display = "none";
+}
+
+async function guardarUsuario(e) {
+  e.preventDefault();
+  const nombre = $("#new-user-nombre").value.trim();
+  const usuario = $("#new-user-usuario").value.trim();
+  const contrasena = $("#new-user-pass").value;
+  const tipoSeleccionado = $("#new-user-tipo").value;
+  const direccion = $("#new-user-direccion").value.trim();
+  const msg = $("#msg-crear-usuario");
+  const submitBtn = $("#btn-submit-usuario");
+
+  // es_admin_s sólo es true cuando el select es "tecnico" (opción admin-s)
+  const esAdminS = tipoSeleccionado === "tecnico";
+  // El tipo enviado al backend siempre es "usuario_sede" a menos que sea admin-s
+  const tipo = esAdminS ? "tecnico" : "usuario_sede";
+
+  if (!nombre || !usuario || !contrasena) {
+    msg.className = "form-msg error";
+    msg.textContent = "Nombre, usuario y contraseña son requeridos.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  if (contrasena.length < 8) {
+    msg.className = "form-msg error";
+    msg.textContent = "La contraseña debe tener al menos 8 caracteres.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Creando usuario…";
+  msg.hidden = true;
+  msg.style.display = "none";
+
+  try {
+    const respuesta = await apiFetch(`/sedes/${encodeURIComponent(state.idSede)}/usuarios`, {
+      method: "POST",
+      body: JSON.stringify({
+        nombre,
+        usuario,
+        contrasena,
+        tipo,
+        direccion: (!esAdminS && direccion) ? direccion : null,
+        es_admin_s: esAdminS,
+      }),
+    });
+
+    if (respuesta && respuesta.status === 201) {
+      msg.className = "form-msg success";
+      msg.textContent = "¡Usuario registrado exitosamente!";
+      msg.hidden = false;
+      msg.style.display = "block";
+      await cargarUsuariosSede();
+      setTimeout(() => {
+        cerrarModalCrearUsuario();
+      }, 700);
+    } else {
+      const err = await (respuesta ? respuesta.json().catch(() => ({})) : {});
+      msg.className = "form-msg error";
+      msg.textContent = err.detail || "No se pudo registrar el usuario.";
+      msg.hidden = false;
+      msg.style.display = "block";
+    }
+  } catch (err) {
+    msg.className = "form-msg error";
+    msg.textContent = "Error al conectar con el servidor.";
+    msg.hidden = false;
+    msg.style.display = "block";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Crear usuario";
+  }
+}
+
+/* Modal Cambiar Contraseña */
+function abrirModalCambiarPass() {
+  const modal = $("#modal-cambiar-pass");
+  const msg = $("#msg-cambiar-pass");
+  const form = $("#form-cambiar-pass");
+  if (form) form.reset();
+  if (msg) {
+    msg.hidden = true;
+    msg.style.display = "none";
+    msg.className = "form-msg";
+    msg.textContent = "";
+  }
+  if (modal) {
+    modal.removeAttribute("hidden");
+    modal.style.display = "grid";
+  }
+  setTimeout(() => {
+    const input = $("#pass-actual");
+    if (input) input.focus();
+  }, 50);
+}
+
+function cerrarModalCambiarPass() {
+  const modal = $("#modal-cambiar-pass");
+  if (!modal) return;
+  modal.setAttribute("hidden", "");
+  modal.style.display = "none";
+}
+
+async function cambiarPassword(e) {
+  e.preventDefault();
+  const actual = $("#pass-actual").value;
+  const nueva = $("#pass-nueva").value;
+  const confirmar = $("#pass-confirmar").value;
+  const msg = $("#msg-cambiar-pass");
+  const submitBtn = $("#btn-submit-pass");
+
+  if (!actual || !nueva || !confirmar) {
+    msg.className = "form-msg error";
+    msg.textContent = "Todos los campos de contraseña son obligatorios.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  if (nueva.length < 8) {
+    msg.className = "form-msg error";
+    msg.textContent = "La nueva contraseña debe tener al menos 8 caracteres.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  if (nueva !== confirmar) {
+    msg.className = "form-msg error";
+    msg.textContent = "La confirmación de la nueva contraseña no coincide.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Actualizando…";
+  msg.hidden = true;
+  msg.style.display = "none";
+
+  try {
+    const respuesta = await apiFetch("/me/password", {
+      method: "POST",
+      body: JSON.stringify({ contrasena_actual: actual, contrasena_nueva: nueva }),
+    });
+
+    if (respuesta && respuesta.ok) {
+      msg.className = "form-msg success";
+      msg.textContent = "¡Contraseña actualizada exitosamente!";
+      msg.hidden = false;
+      msg.style.display = "block";
+      setTimeout(() => {
+        cerrarModalCambiarPass();
+      }, 1200);
+    } else {
+      const err = await (respuesta ? respuesta.json().catch(() => ({})) : {});
+      msg.className = "form-msg error";
+      msg.textContent = err.detail || "Error al actualizar contraseña.";
+      msg.hidden = false;
+      msg.style.display = "block";
+    }
+  } catch (err) {
+    msg.className = "form-msg error";
+    msg.textContent = "Error al conectar con el servidor.";
+    msg.hidden = false;
+    msg.style.display = "block";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Actualizar contraseña";
+  }
+}
+
+async function enviarHeartbeat() {
+  try {
+    await apiFetch("/heartbeat", { method: "POST" });
+  } catch (e) { /* no-op */ }
+}
+
+
 /* Eventos */
 $('#logout').addEventListener('click', cerrarSesion);
 $('#refresh-sede').addEventListener('click', () => {
   cargarSedeEspecifica();
-  actualizarServicios();
+  cargarUsuariosSede();
 });
+
+const btnCrearUser = $('#btn-crear-usuario');
+if (btnCrearUser) btnCrearUser.addEventListener('click', abrirModalCrearUsuario);
+const btnCerrarUser = $('#btn-cerrar-modal-usuario');
+if (btnCerrarUser) btnCerrarUser.addEventListener('click', cerrarModalCrearUsuario);
+const btnCancUser = $('#btn-cancelar-usuario');
+if (btnCancUser) btnCancUser.addEventListener('click', cerrarModalCrearUsuario);
+const formUser = $('#form-usuario');
+if (formUser) formUser.addEventListener('submit', guardarUsuario);
+
+// Listener para cambiar visibilidad de campos según tipo de usuario
+const selectTipo = $('#new-user-tipo');
+if (selectTipo) {
+  selectTipo.addEventListener('change', () => {
+    const esAdminS = selectTipo.value === 'tecnico';
+    const groupDir = $('#group-direccion');
+    const avisoAdminS = $('#aviso-admin-s');
+    if (groupDir) groupDir.hidden = esAdminS;
+    if (avisoAdminS) avisoAdminS.hidden = !esAdminS;
+  });
+}
+
+
+const btnCambiarPass = $('#btn-cambiar-pass');
+if (btnCambiarPass) btnCambiarPass.addEventListener('click', abrirModalCambiarPass);
+const btnCerrarPass = $('#btn-cerrar-modal-pass');
+if (btnCerrarPass) btnCerrarPass.addEventListener('click', cerrarModalCambiarPass);
+const btnCancPass = $('#btn-cancelar-pass');
+if (btnCancPass) btnCancPass.addEventListener('click', cerrarModalCambiarPass);
+const formPass = $('#form-cambiar-pass');
+if (formPass) formPass.addEventListener('submit', cambiarPassword);
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    cerrarModalCrearUsuario();
+    cerrarModalCambiarPass();
+  }
+});
+
+const modalUser = $('#modal-crear-usuario');
+if (modalUser) {
+  modalUser.addEventListener('click', (e) => {
+    if (e.target === modalUser) cerrarModalCrearUsuario();
+  });
+}
+const modalPass = $('#modal-cambiar-pass');
+if (modalPass) {
+  modalPass.addEventListener('click', (e) => {
+    if (e.target === modalPass) cerrarModalCambiarPass();
+  });
+}
 
 $('#q-disp').addEventListener('input', (e) => {
   state.filtroDisp = e.target.value;
@@ -463,17 +721,6 @@ $('#q-usuarios').addEventListener('input', (e) => {
   state.filtroUsuarios = e.target.value;
   renderUsuarios();
 });
-
-$('#q-servicios').addEventListener('input', (e) => {
-  state.textoServicios = e.target.value;
-  renderServicios();
-});
-
-document.querySelectorAll('.chip[data-f]').forEach((b) => b.addEventListener('click', () => {
-  document.querySelectorAll('.chip[data-f]').forEach((x) => x.classList.toggle('on', x === b));
-  state.filtroServicios = b.dataset.f;
-  renderServicios();
-}));
 
 /* Tema */
 const root = document.documentElement;
@@ -527,7 +774,6 @@ async function iniciar() {
   }
 
   if (!idSede) {
-    // No hay sede accesible: volver a la lista principal
     window.location.replace(PANEL_SEDES);
     return;
   }
@@ -537,8 +783,14 @@ async function iniciar() {
 
   await cargarSedeEspecifica();
   await cargarUsuariosSede();
-  await actualizarServicios();
-  setInterval(actualizarServicios, 15000);
+
+  // Polling de estado cada 2 segundos
+  setInterval(cargarUsuariosSede, 2000);
+  setInterval(cargarSedeEspecifica, 2000);
+
+  enviarHeartbeat();
+  setInterval(enviarHeartbeat, 30000);
 }
 
 iniciar();
+

@@ -31,7 +31,6 @@ services:
       APP_ENV: production
       HOST_APP: 0.0.0.0
       PORT_APP: 8000
-      # Solo se confía en la IP fija del contenedor web (ver red cfs).
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.28.0.10}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ALGORITHM: HS256

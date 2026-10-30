@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CFS-Admin · Portal de Usuario</title>
+<link rel="stylesheet" href="dashboard.css">
+<style>
+  .user-portal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 22px;
+    margin-top: 24px;
+  }
+  .service-card {
+    display: flex;
+    flex-direction: column;
+    padding: 26px;
+    position: relative;
+    border-top: 5px solid var(--yellow);
+    transition: transform .2s, box-shadow .2s;
+  }
+  .service-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 28px rgba(0,0,0,.35);
+  }
+  .service-card.disabled {
+    opacity: 0.65;
+    border-top-color: var(--muted);
+  }
+  .service-icon {
+    font-size: 2.8rem;
+    margin-bottom: 12px;
+  }
+  .service-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .service-title {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .service-desc {
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+    margin: 0 0 20px;
+    flex: 1;
+  }
+  .uid-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0,0,0,0.06);
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px dashed var(--line);
+    margin: 14px 0 0;
+  }
+  :root[data-theme="dark"] .uid-box {
+    background: rgba(255,255,255,0.06);
+  }
+  .uid-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .uid-value {
+    font-family: ui-monospace, monospace;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 0.03em;
+    user-select: all;
+  }
+  .btn-copy {
+    margin-left: auto;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i class="s s1"></i><i class="s s2"></i><i class="s s3"></i></div>
+
+<header class="top">
+  <div class="brand"><span class="mark">CFS</span><b>CFS-Admin · Portal</b></div>
+  <div class="user-info" id="user-badge" hidden>
+    <span class="user-name" id="user-name">Cargando…</span>
+    <span class="user-tag" id="user-role">CLIENTE</span>
+  </div>
+  <div class="actions">
+    <button class="ghost" id="btn-cambiar-pass" type="button" aria-label="Cambiar contraseña">🔑 Contraseña</button>
+    <button class="ghost" id="theme" type="button" aria-label="Cambiar tema">Tema</button>
+    <button class="ghost" id="logout" type="button">Salir</button>
+  </div>
+</header>
+
+<main class="wrap" id="panel" hidden>
+  <!-- Banner de bienvenida del usuario -->
+  <section class="sede-banner card" aria-label="Información de perfil">
+    <div class="sede-banner-content">
+      <div class="sede-badge-row">
+        <span class="pill up" id="user-online-pill">En línea</span>
+        <span class="sede-id-tag" id="user-sede-tag">Sede no asignada</span>
+      </div>
+      <h1 id="user-saludo">Bienvenido</h1>
+      <p class="lead" id="user-sede-lead">Accede a tus servicios de red intra-sede autorizados</p>
+      
+      <div class="uid-box">
+        <span class="uid-label">Tu UID Único:</span>
+        <span class="uid-value" id="user-uid">—</span>
+        <button class="ghost btn-copy" id="btn-copiar-uid" type="button" title="Copiar UID al portapapeles">📋 Copiar</button>
+      </div>
+      <small style="display:block; margin-top:6px; color:var(--muted); font-size:0.8rem">
+        Comparte tu UID con otros usuarios de tu sede para que puedan agregarte al chat o videollamadas.
+      </small>
+    </div>
+  </section>
+
+  <!-- Tarjetas de servicios habilitados -->
+  <div class="user-portal-grid">
+    <!-- Servicio: Chat -->
+    <article class="service-card card" id="card-chat">
+      <div class="service-icon">💬</div>
+      <div class="service-header">
+        <h2 class="service-title">Chat Intra-Sede</h2>
+        <span class="pill" id="badge-chat">Consultando…</span>
+      </div>
+      <p class="service-desc">
+        Mensajería de texto segura y privada exclusivamente con contactos y usuarios de tu misma sede. Agrega contactos por UID único y formaliza conversaciones.
+      </p>
+      <button class="btn" id="btn-entrar-chat" type="button" disabled>Abrir Chat →</button>
+    </article>
+
+    <!-- Servicio: Videoconferencia -->
+    <article class="service-card card" id="card-video">
+      <div class="service-icon">📹</div>
+      <div class="service-header">
+        <h2 class="service-title">Videoconferencias</h2>
+        <span class="pill" id="badge-video">Consultando…</span>
+      </div>
+      <p class="service-desc">
+        Videollamadas cifradas peer-to-peer en tiempo real mediante WebRTC. Comunícate cara a cara con tus contactos autorizados de la sede.
+      </p>
+      <button class="btn" id="btn-entrar-video" type="button" disabled>Iniciar Videollamada →</button>
+    </article>
+  </div>
+</main>
+
+<!-- Modal: Cambiar Contraseña Segura -->
+<div class="modal-backdrop" id="modal-cambiar-pass" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-pass">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="titulo-modal-pass">Cambiar Contraseña</h2>
+      <button class="modal-close" id="btn-cerrar-modal-pass" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <p class="modal-sub">Ingresa tu contraseña actual y la nueva contraseña (mínimo 8 caracteres).</p>
+    
+    <form id="form-cambiar-pass" novalidate>
+      <div class="form-group">
+        <label for="pass-actual">Contraseña actual <span class="req">*</span></label>
+        <input type="password" id="pass-actual" required autocomplete="current-password">
+      </div>
+
+      <div class="form-group">
+        <label for="pass-nueva">Nueva contraseña <span class="req">*</span></label>
+        <input type="password" id="pass-nueva" required autocomplete="new-password" minlength="8">
+      </div>
+
+      <div class="form-group">
+        <label for="pass-confirmar">Confirmar nueva contraseña <span class="req">*</span></label>
+        <input type="password" id="pass-confirmar" required autocomplete="new-password" minlength="8">
+      </div>
+
+      <div class="form-msg" id="msg-cambiar-pass" role="alert" hidden></div>
+
+      <div class="modal-actions">
+        <button class="ghost" id="btn-cancelar-pass" type="button">Cancelar</button>
+        <button class="btn" id="btn-submit-pass" type="submit">Actualizar contraseña</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="module" src="usuario.js"></script>
+</body>
+</html>

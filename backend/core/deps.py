@@ -49,8 +49,13 @@ def requireTipos(*tipos: str):
 
 def obtenerTipoAdmin(user: Empleado) -> str:
     """Clasifica al usuario en 'admin-g', 'admin-s' o 'usuario'."""
-    if (user is None or not user.activo):
+    if user is None or not user.activo:
         return "usuario"
+
+    # Los usuarios de tipo 'usuario_sede' o 'empleado' son exclusivamente clientes y jamás administradores
+    if user.tipo in ("usuario_sede", "empleado"):
+        return "usuario"
+
     rol_nombre = (user.rol.nombre if user.rol else "").strip().lower()
     nivel = getattr(user, "nivel_acceso", 0) or 0
     id_sede = getattr(user, "id_sede", None)
@@ -62,10 +67,12 @@ def obtenerTipoAdmin(user: Empleado) -> str:
     ):
         return "admin-g"
 
-    # admin-s: Administrador de sede (acceso exclusivo a una sede)
+    # admin-s: Administrador de sede (acceso exclusivo a una sede asignada)
+    # Debe ser de tipo tecnico (o tecnico_jefe con nivel < 5) con rol explícito de admin-s y sede asignada
     if (
-        rol_nombre in ("administrador de sede", "admin-s")
-        or (id_sede is not None and nivel < 5)
+        user.tipo in ("tecnico", "tecnico_jefe")
+        and id_sede is not None
+        and rol_nombre in ("administrador de sede", "admin-s")
     ):
         return "admin-s"
 

@@ -105,8 +105,16 @@ def _logout(data: RefreshRequest, db: Annotated[Session, Depends(getDb)]):
 
 
 @router.get('/me')
-def _me(user: Annotated[Empleado, Depends(getCurrentUser)]):
+def _me(user: Annotated[Empleado, Depends(getCurrentUser)], db: Annotated[Session, Depends(getDb)]):
     tipo_admin = obtenerTipoAdmin(user)
+    id_sede = getattr(user, "id_sede", None)
+    sede_nombre = None
+    if id_sede is not None:
+        from db.template.sede import Sede
+        sede_obj = db.get(Sede, id_sede)
+        if sede_obj:
+            sede_nombre = sede_obj.nombre
+
     return {
         "id": user.id_empleado,
         "nombre": user.nombre,
@@ -115,9 +123,12 @@ def _me(user: Annotated[Empleado, Depends(getCurrentUser)]):
         "rol": user.rol.nombre if user.rol else "Sin rol",
         "tipo_admin": tipo_admin,
         "nivel_acceso": getattr(user, "nivel_acceso", None),
-        "id_sede": getattr(user, "id_sede", None),
+        "id_sede": id_sede,
+        "sede_nombre": sede_nombre,
+        "uid_publico": getattr(user, "uid_publico", None),
         "es_admin": tipo_admin in ("admin-g", "admin-s"),
         "es_admin_g": tipo_admin == "admin-g",
         "es_admin_s": tipo_admin == "admin-s",
         "direccion": user.direccion if isinstance(user, UsuarioSede) else None,
     }
+
