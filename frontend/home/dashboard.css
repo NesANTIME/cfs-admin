@@ -165,3 +165,16 @@ input:focus-visible{outline:0}
 .btn-toggle.on{background:var(--okbg);color:var(--ok);border-color:var(--ok)}
 .btn-toggle.off{background:var(--downbg);color:var(--danger);border-color:var(--danger)}
 .btn-toggle:disabled{opacity:.5;cursor:not-allowed}
+
+/* Botón de desactivar usuario */
+.btn-desactivar{height:30px;padding:0 10px;border:1px solid var(--danger);border-radius:6px;background:transparent;color:var(--danger);font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-desactivar:hover{background:var(--downbg)}
+
+/* Etiquetas de rol en tabla de usuarios */
+.user-tag-admin-s{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--okbg);color:var(--ok);border:1px solid var(--ok);text-transform:uppercase;letter-spacing:.02em;white-space:nowrap}
+.user-tag-user{font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(0,0,0,.07);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+:root[data-theme="dark"] .user-tag-user{background:rgba(255,255,255,.08)}
+
+/* Banner de sede en modal */
+.modal-sede-info{display:flex;align-items:center;gap:10px;background:var(--okbg);border:1px solid var(--ok);border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:.88rem;font-weight:600;color:var(--ok)}
+.modal-sede-icon{font-size:1.1rem}

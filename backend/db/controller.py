@@ -57,6 +57,7 @@ def asegurarAdminPredeterminado(
 
         emp = db.execute(select(Empleado).where(Empleado.usuario == usuario)).scalar_one_or_none()
         if (emp is None):
+            import uuid
             db.add(TecnicoJefe(
                 nombre = nombre,
                 usuario = usuario,
@@ -64,6 +65,7 @@ def asegurarAdminPredeterminado(
                 id_rol = rol.id_rol,
                 nivel_acceso = 5,
                 activo = True,
+                uid_publico = str(uuid.uuid4()),
             ))
             db.commit()
             print(f"[+] Administrador predeterminado '{usuario}' creado exitosamente.")
@@ -74,9 +76,10 @@ def asegurarAdminPredeterminado(
             emp.activo = True
             emp.intentos_fallidos = 0
             emp.bloqueado_hasta = None
+            if not getattr(emp, "uid_publico", None):
+                import uuid
+                emp.uid_publico = str(uuid.uuid4())
 
-            if (not verifyPassword(emp.contrasena_hash, password)):
-                emp.contrasena_hash = hashearPassword(password)
 
             db.flush()
             db.execute(

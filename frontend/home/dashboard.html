@@ -19,10 +19,12 @@
     <span class="user-tag" id="user-role"></span>
   </div>
   <div class="actions">
+    <button class="ghost" id="btn-cambiar-pass" type="button" aria-label="Cambiar contraseña">🔑 Contraseña</button>
     <button class="ghost" id="theme" type="button" aria-label="Cambiar tema">Tema</button>
     <button class="ghost" id="logout" type="button">Salir</button>
   </div>
 </header>
+
 
 <main class="wrap" id="panel" hidden>
 
@@ -55,11 +57,14 @@
     <div class="panel-head-row">
       <div>
         <h2 class="panel-title">👥 Usuarios y Servicios de la Sede</h2>
-        <p class="panel-sub">Estado de conexión y servicios habilitados por usuario</p>
+        <p class="panel-sub">Monitoreo de estado en línea, UID y asignación de servicios de red</p>
+      </div>
+      <div>
+        <button class="btn" id="btn-crear-usuario" type="button">➕ Crear Usuario</button>
       </div>
     </div>
     <div class="tools">
-      <input id="q-usuarios" type="search" placeholder="Buscar usuario por nombre o usuario…" aria-label="Buscar usuario">
+      <input id="q-usuarios" type="search" placeholder="Buscar por nombre, usuario o UID…" aria-label="Buscar usuario">
       <span class="pill up" id="badge-usuarios-count">0 usuarios</span>
     </div>
     <div class="scroll">
@@ -68,11 +73,13 @@
           <tr>
             <th style="width:50px">ID</th>
             <th>Nombre</th>
-            <th style="width:120px">Usuario</th>
-            <th style="width:100px">Tipo</th>
-            <th style="width:110px">Estado</th>
-            <th style="width:160px">Videoconf.</th>
-            <th style="width:130px">Chat</th>
+            <th style="width:110px">Usuario</th>
+            <th style="width:110px">Tipo / Rol</th>
+            <th style="width:140px">UID Único</th>
+            <th style="width:100px">Estado</th>
+            <th style="width:140px">Videoconf.</th>
+            <th style="width:120px">Chat</th>
+            <th style="width:100px; text-align:right">Acciones</th>
           </tr>
         </thead>
         <tbody id="rows-usuarios"></tbody>
@@ -80,6 +87,7 @@
     </div>
     <p class="empty" id="empty-usuarios" hidden>No hay usuarios registrados en esta sede.</p>
   </section>
+
 
   <!-- Sección 1: Equipos y Dispositivos de Red de la Sede -->
   <section class="card panel" aria-label="Dispositivos de red de la sede">
@@ -111,43 +119,105 @@
     <p class="empty" id="empty-dispositivos" hidden>No hay dispositivos registrados en esta sede todavía.</p>
   </section>
 
-  <!-- Sección 2: Monitoreo de Servicios de Red en la Sede -->
-  <section class="card panel" aria-label="Monitoreo de servicios de red">
-    <div class="panel-head-row">
-      <div>
-        <h2 class="panel-title">📊 Monitoreo de Enlaces y Servicios de la Sede</h2>
-        <p class="panel-sub">Latencia, disponibilidad y estado de los servicios que transitan por esta sede</p>
-      </div>
-    </div>
-    <div class="tools">
-      <input id="q-servicios" type="search" placeholder="Buscar servicio o cliente…" aria-label="Buscar servicio">
-      <div class="chips" role="group" aria-label="Filtrar por estado">
-        <button class="chip on" data-f="all" type="button">Todos</button>
-        <button class="chip" data-f="up" type="button">En línea</button>
-        <button class="chip" data-f="warn" type="button">Alertas</button>
-        <button class="chip" data-f="down" type="button">Caídos</button>
-      </div>
-    </div>
-    <div class="scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>Cliente / Enlace</th>
-            <th>Servicio</th>
-            <th>Estado</th>
-            <th>Latencia</th>
-            <th>Últimas lecturas</th>
-            <th>Disponibilidad</th>
-          </tr>
-        </thead>
-        <tbody id="rows-servicios"></tbody>
-      </table>
-    </div>
-    <p class="empty" id="empty-servicios" hidden>Ningún servicio coincide con la búsqueda.</p>
-  </section>
+
 
 </main>
+
+<!-- Modal: Crear Nuevo Usuario en la Sede -->
+<div class="modal-backdrop" id="modal-crear-usuario" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-usuario">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="titulo-modal-usuario">Registrar Usuario en la Sede</h2>
+      <button class="modal-close" id="btn-cerrar-modal-usuario" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <p class="modal-sub">Crea un usuario cliente o asigna un Administrador de Sede (admin-s) exclusivo para esta sede.</p>
+
+    <!-- Banner informativo de la sede actual -->
+    <div class="modal-sede-info" id="modal-sede-info">
+      <span class="modal-sede-icon">🏢</span>
+      <span id="modal-sede-label">Sede actual</span>
+    </div>
+
+    <form id="form-usuario" novalidate>
+      <div class="form-group">
+        <label for="new-user-nombre">Nombre completo <span class="req">*</span></label>
+        <input type="text" id="new-user-nombre" required placeholder="Ej: Carlos Gómez" maxlength="100">
+      </div>
+
+      <div class="form-group">
+        <label for="new-user-usuario">Nombre de usuario <span class="req">*</span></label>
+        <input type="text" id="new-user-usuario" required placeholder="Ej: cgomez" minlength="3" maxlength="50" autocomplete="off">
+      </div>
+
+      <div class="form-group">
+        <label for="new-user-pass">Contraseña temporal <span class="req">*</span></label>
+        <input type="password" id="new-user-pass" required placeholder="Mínimo 8 caracteres" minlength="8" maxlength="128">
+      </div>
+
+      <div class="form-group">
+        <label for="new-user-tipo">Tipo de cuenta <span class="req">*</span></label>
+        <select id="new-user-tipo" style="width:100%; height:42px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); padding:0 12px; font:inherit;">
+          <option value="usuario_sede">👤 Usuario de Sede (Cliente / Empleado)</option>
+          <option value="tecnico" id="opt-admin-s">🛡️ Administrador de Sede (admin-s)</option>
+        </select>
+      </div>
+
+      <!-- Aviso admin-s: una sede solo puede tener uno -->
+      <div class="form-msg" id="aviso-admin-s" style="background:var(--warnbg);color:var(--warn);border-left:4px solid var(--warn);" hidden>
+        ⚠️ Cada sede solo puede tener <strong>un</strong> Administrador de Sede activo. Se bloqueará si ya existe uno.
+      </div>
+
+      <div class="form-group" id="group-direccion">
+        <label for="new-user-direccion">Dirección o ubicación interna</label>
+        <input type="text" id="new-user-direccion" placeholder="Ej: Piso 3, Oficina 302" maxlength="255">
+      </div>
+
+      <div class="form-msg" id="msg-crear-usuario" role="alert" hidden></div>
+
+      <div class="modal-actions">
+        <button class="ghost" id="btn-cancelar-usuario" type="button">Cancelar</button>
+        <button class="btn" id="btn-submit-usuario" type="submit">Crear usuario</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Cambiar Contraseña Segura -->
+<div class="modal-backdrop" id="modal-cambiar-pass" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-pass">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="titulo-modal-pass">Cambiar Contraseña</h2>
+      <button class="modal-close" id="btn-cerrar-modal-pass" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <p class="modal-sub">Ingresa tu contraseña actual y la nueva contraseña (mínimo 8 caracteres).</p>
+    
+    <form id="form-cambiar-pass" novalidate>
+      <div class="form-group">
+        <label for="pass-actual">Contraseña actual <span class="req">*</span></label>
+        <input type="password" id="pass-actual" required autocomplete="current-password">
+      </div>
+
+      <div class="form-group">
+        <label for="pass-nueva">Nueva contraseña <span class="req">*</span></label>
+        <input type="password" id="pass-nueva" required autocomplete="new-password" minlength="8">
+      </div>
+
+      <div class="form-group">
+        <label for="pass-confirmar">Confirmar nueva contraseña <span class="req">*</span></label>
+        <input type="password" id="pass-confirmar" required autocomplete="new-password" minlength="8">
+      </div>
+
+      <div class="form-msg" id="msg-cambiar-pass" role="alert" hidden></div>
+
+      <div class="modal-actions">
+        <button class="ghost" id="btn-cancelar-pass" type="button">Cancelar</button>
+        <button class="btn" id="btn-submit-pass" type="submit">Actualizar contraseña</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script type="module" src="js.js"></script>
 </body>
 </html>
+

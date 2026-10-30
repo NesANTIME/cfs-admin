@@ -33,6 +33,12 @@ import db.template  # registra todos los modelos
 from api.login import router as router_login
 from api.sedes import router as router_sedes
 from api.servicios_usuario import router as router_servicios_usuario
+from api.usuarios import router as router_usuarios
+from api.perfil import router as router_perfil
+from api.heartbeat import router as router_heartbeat
+from api.contactos import router as router_contactos
+from api.chat import router as router_chat
+from api.videoconferencia import router as router_videoconferencia
 # ---
 
 app.add_middleware(
@@ -46,3 +52,10 @@ app.add_middleware(
 app.include_router(router_login)
 app.include_router(router_sedes)
 app.include_router(router_servicios_usuario)
+app.include_router(router_usuarios)
+app.include_router(router_perfil)
+app.include_router(router_heartbeat)
+app.include_router(router_contactos)
+app.include_router(router_chat)
+app.include_router(router_videoconferencia)
+

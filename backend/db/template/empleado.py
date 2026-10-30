@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 from .base import Base
 from typing import TYPE_CHECKING
@@ -26,6 +27,10 @@ class Empleado(Base):
     bloqueado_hasta: Mapped[datetime | None] = mapped_column(DateTime(timezone = True))
     en_linea: Mapped[bool] = mapped_column(Boolean(), default=False, server_default="false")
     ultima_vez_en_linea: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    uid_publico: Mapped[str] = mapped_column(
+        String(36), unique = True, default = lambda: str(uuid.uuid4())
+    )
+
 
 
     id_rol: Mapped[int] = mapped_column(ForeignKey("roles.id_rol", ondelete = "RESTRICT"))
@@ -94,8 +99,11 @@ class UsuarioSede(Empleado):
         ForeignKey("empleados.id_empleado", ondelete = "CASCADE"), primary_key = True
     )
     direccion: Mapped[str | None] = mapped_column(String(255))
+    id_sede: Mapped[int | None] = mapped_column(ForeignKey("sedes.id_sede", ondelete = "SET NULL"), nullable = True)
+    sede: Mapped["Sede | None"] = relationship(foreign_keys = [id_sede])
     servicios: Mapped[list["ServicioRed"]] = relationship(
         back_populates = "usuario_sede", foreign_keys = "ServicioRed.id_usuario_sede"
     )
 
     __mapper_args__ = {"polymorphic_identity": "usuario_sede"}
+

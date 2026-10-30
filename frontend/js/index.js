@@ -36,6 +36,104 @@ const check = (fid, mid, hasError, errorMessage) => {
   return !hasError;
 };
 
+/**
+ * Redirige al panel correspondiente según el perfil del usuario.
+ */
+function redirigirSegunRol(perfil) {
+  if (perfil && perfil.tipo_admin === "usuario") {
+    window.location.replace("home/usuario.html");
+  } else {
+    window.location.replace("home/index.html");
+  }
+}
+
+/**
+ * Comprueba si ya existe una sesión autenticada activa y redirige automáticamente al dashboard.
+ */
+async function verificarSesionExistente() {
+  const access = sessionStorage.getItem("access_token") || localStorage.getItem("access_token");
+  const refresh = sessionStorage.getItem("refresh_token") || localStorage.getItem("refresh_token");
+
+  if (!access && !refresh) return;
+
+  status.className = "msg";
+  status.textContent = "Comprobando sesión activa…";
+  btn.disabled = true;
+  btn.textContent = "Comprobando…";
+
+  try {
+    let token = access;
+    let respMe = null;
+
+    if (token) {
+      respMe = await fetch(`${urlserver}/me`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json",
+        },
+        cache: "no-store",
+      });
+    }
+
+    // Si access_token expiró pero hay refresh_token, intentar renovarlo
+    if ((!respMe || respMe.status === 401) && refresh) {
+      const respRefresh = await fetch(`${urlserver}/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({ refresh_token: refresh }),
+        cache: "no-store",
+      });
+
+      if (respRefresh.ok) {
+        const datos = await respRefresh.json();
+        if (datos.access_token && datos.refresh_token) {
+          sessionStorage.setItem("access_token", datos.access_token);
+          sessionStorage.setItem("refresh_token", datos.refresh_token);
+          token = datos.access_token;
+          respMe = await fetch(`${urlserver}/me`, {
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Accept": "application/json",
+            },
+            cache: "no-store",
+          });
+        }
+      }
+    }
+
+    if (respMe && respMe.ok) {
+      const perfil = await respMe.json();
+      status.className = "msg ok";
+      status.textContent = "Sesión activa detectada. Redirigiendo…";
+      btn.textContent = "Redirigiendo…";
+      redirigirSegunRol(perfil);
+      return;
+    }
+  } catch (err) {
+    console.warn("No se pudo validar sesión existente:", err);
+  }
+
+  // Token inválido o expirado sin posibilidad de renovar: limpiar almacenamiento
+  sessionStorage.removeItem("access_token");
+  sessionStorage.removeItem("refresh_token");
+  sessionStorage.removeItem("sede_actual");
+  try {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+  } catch (e) {}
+
+  status.className = "msg";
+  status.textContent = "";
+  btn.disabled = false;
+  btn.textContent = "Ingresar";
+}
+
+// Ejecutar comprobación automática inmediatamente al cargar el script
+verificarSesionExistente();
+
 async function iniciarSesion(username, password) {
   const respuesta = await fetch(`${urlserver}/login`, {
     method: "POST",
@@ -126,7 +224,26 @@ form.addEventListener("submit", async (e) => {
     status.className = "msg ok";
     status.textContent = "Sesión iniciada correctamente.";
 
-    window.location.assign("home/index.html");
+    // Consultar tipo de usuario para redirigir al panel correspondiente
+    try {
+      const respMe = await fetch(`${urlserver}/me`, {
+        headers: {
+          "Authorization": `Bearer ${resultado.access_token}`,
+          "Accept": "application/json",
+        },
+        cache: "no-store",
+      });
+      if (respMe.ok) {
+        const perfil = await respMe.json();
+        redirigirSegunRol(perfil);
+        return;
+      }
+    } catch (e) {
+      // Si falla la consulta a /me, proceder por defecto
+    }
+
+    window.location.replace("home/index.html");
+
 
   } catch (error) {
     console.error("Error en el inicio de sesión:", error);
