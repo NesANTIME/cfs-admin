@@ -1,49 +1,125 @@
-from typing import Annotated
 import jwt
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Annotated
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from db.controller import getDb
+from core.security import decodeToken
+from db.template.empleado import Empleado
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from core.security import decode_token
-from db.controller import get_db
-from db.templates.user import usuario
+_bearer = HTTPBearer(auto_error = False)
 
 
-security_scheme = HTTPBearer(auto_error=True)
-
-
-def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(security_scheme)],
-    db: Annotated[Session, Depends(get_db)]) -> usuario:
-
-    token = credentials.credentials
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Credenciales de autenticación no válidas o expiradas.",
-        headers={"WWW-Authenticate": "Bearer"},
+def _noAuth() -> HTTPException:
+    return HTTPException(
+        status_code = status.HTTP_401_UNAUTHORIZED,
+        detail = "No autenticado.",
+        headers = {"WWW-Authenticate": "Bearer"},
     )
 
+
+def getCurrentUser(
+    cred: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    db: Annotated[Session, Depends(getDb)],
+) -> Empleado:
+    if cred is None:
+        raise _noAuth()
     try:
-        payload = decode_token(token)
-        token_type: str = payload.get("type")
-        username: str = payload.get("sub")
+        payload = decodeToken(cred.credentials)
+        if payload.get("type") != "access":      # un refresh token NO sirve como access
+            raise _noAuth()
+        user_id = int(payload["sub"])
+    except (jwt.PyJWTError, ValueError, KeyError):
+        raise _noAuth()
 
-        if token_type != "access" or username is None:
-            raise credentials_exception
-
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="El token de acceso ha expirado.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except jwt.PyJWTError:
-        raise credentials_exception
-
-
-    user = db.execute(select(usuario).where(usuario.nombre == username)).scalar_one_or_none()
-    if user is None:
-        raise credentials_exception
-
+    user = db.get(Empleado, user_id)
+    if user is None or not user.activo:
+        raise _noAuth()
     return user
+
+
+def requireTipos(*tipos: str):
+    """Uso: Depends(requireTipos("tecnico_jefe"))"""
+    def _checker(user: Annotated[Empleado, Depends(getCurrentUser)]) -> Empleado:
+        if (user.tipo not in tipos):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Permiso insuficiente.")
+        return user
+    return _checker
+
+
+def obtenerTipoAdmin(user: Empleado) -> str:
+    """Clasifica al usuario en 'admin-g', 'admin-s' o 'usuario'."""
+    if user is None or not user.activo:
+        return "usuario"
+
+    # Los usuarios de tipo 'usuario_sede' o 'empleado' son exclusivamente clientes y jamás administradores
+    if user.tipo in ("usuario_sede", "empleado"):
+        return "usuario"
+
+    rol_nombre = (user.rol.nombre if user.rol else "").strip().lower()
+    nivel = getattr(user, "nivel_acceso", 0) or 0
+    id_sede = getattr(user, "id_sede", None)
+
+    # admin-g: Administrador general / rango más alto (acceso a todas las sedes)
+    if (
+        rol_nombre in ("administrador", "administrador general", "admin-g", "admin")
+        or (user.tipo == "tecnico_jefe" and nivel >= 5)
+    ):
+        return "admin-g"
+
+    # admin-s: Administrador de sede (acceso exclusivo a una sede asignada)
+    # Debe ser de tipo tecnico (o tecnico_jefe con nivel < 5) con rol explícito de admin-s y sede asignada
+    if (
+        user.tipo in ("tecnico", "tecnico_jefe")
+        and id_sede is not None
+        and rol_nombre in ("administrador de sede", "admin-s")
+    ):
+        return "admin-s"
+
+    return "usuario"
+
+
+def esAdminG(user: Empleado) -> bool:
+    return obtenerTipoAdmin(user) == "admin-g"
+
+
+def esAdminS(user: Empleado) -> bool:
+    return obtenerTipoAdmin(user) == "admin-s"
+
+
+def esAdminAltoRango(user: Empleado) -> bool:
+    """Alias histórico para admin-g."""
+    return esAdminG(user)
+
+
+def requireAdminG(
+    user: Annotated[Empleado, Depends(getCurrentUser)],
+) -> Empleado:
+    """Exige rol de Administrador General (admin-g)."""
+    if (not esAdminG(user)):
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail = "Permiso insuficiente: se requiere rango de Administrador General (admin-g).",
+        )
+    return user
+
+
+def requireAdminAltoRango(
+    user: Annotated[Empleado, Depends(getCurrentUser)],
+) -> Empleado:
+    """Alias histórico para requireAdminG."""
+    return requireAdminG(user)
+
+
+def requireAdmin(
+    user: Annotated[Empleado, Depends(getCurrentUser)],
+) -> Empleado:
+    """Permite tanto a admin-g como a admin-s."""
+    if (obtenerTipoAdmin(user) not in ("admin-g", "admin-s")):
+        raise HTTPException(
+            status_code = status.HTTP_403_FORBIDDEN,
+            detail = "Permiso insuficiente: se requiere rango de administrador.",
+        )
+    return user
+
+

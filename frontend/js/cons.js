@@ -1,1 +1,0 @@
-export const urlserver = "http://localhost:8000"

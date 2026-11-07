@@ -1,9 +1,8 @@
 
-import { urlserver } from "./cons.js";
-
 "use strict";
 
-// Referencias a los elementos HTML
+const urlserver = "/api";
+
 const $ = (id) => document.getElementById(id);
 
 const form = $("form");
@@ -13,14 +12,12 @@ const btn = $("btn");
 const status = $("status");
 const toggleBtn = $("toggle");
 
-// Comprobar que los elementos necesarios existen
 if (!form || !user || !pass || !btn || !status || !toggleBtn) {
   throw new Error(
-    "No se encontraron todos los elementos necesarios del formulario."
+    "No se encontraron todos los elementos del formulario."
   );
 }
 
-// Mostrar u ocultar la contraseña
 toggleBtn.addEventListener("click", function () {
   const show = pass.type === "password";
 
@@ -29,7 +26,6 @@ toggleBtn.addEventListener("click", function () {
   this.setAttribute("aria-pressed", String(show));
 });
 
-// Validar campos del formulario
 const check = (fid, mid, hasError, errorMessage) => {
   const field = $(fid);
   const message = $(mid);
@@ -40,22 +36,124 @@ const check = (fid, mid, hasError, errorMessage) => {
   return !hasError;
 };
 
-// Enviar las credenciales al backend
+/**
+ * Redirige al panel correspondiente según el perfil del usuario.
+ */
+function redirigirSegunRol(perfil) {
+  if (perfil && perfil.tipo_admin === "usuario") {
+    window.location.replace("home/usuario.html");
+  } else {
+    window.location.replace("home/index.html");
+  }
+}
+
+/**
+ * Comprueba si ya existe una sesión autenticada activa y redirige automáticamente al dashboard.
+ */
+async function verificarSesionExistente() {
+  const access = sessionStorage.getItem("access_token") || localStorage.getItem("access_token");
+  const refresh = sessionStorage.getItem("refresh_token") || localStorage.getItem("refresh_token");
+
+  if (!access && !refresh) return;
+
+  status.className = "msg";
+  status.textContent = "Comprobando sesión activa…";
+  btn.disabled = true;
+  btn.textContent = "Comprobando…";
+
+  try {
+    let token = access;
+    let respMe = null;
+
+    if (token) {
+      respMe = await fetch(`${urlserver}/me`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Accept": "application/json",
+        },
+        cache: "no-store",
+      });
+    }
+
+    // Si access_token expiró pero hay refresh_token, intentar renovarlo
+    if ((!respMe || respMe.status === 401) && refresh) {
+      const respRefresh = await fetch(`${urlserver}/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({ refresh_token: refresh }),
+        cache: "no-store",
+      });
+
+      if (respRefresh.ok) {
+        const datos = await respRefresh.json();
+        if (datos.access_token && datos.refresh_token) {
+          sessionStorage.setItem("access_token", datos.access_token);
+          sessionStorage.setItem("refresh_token", datos.refresh_token);
+          token = datos.access_token;
+          respMe = await fetch(`${urlserver}/me`, {
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Accept": "application/json",
+            },
+            cache: "no-store",
+          });
+        }
+      }
+    }
+
+    if (respMe && respMe.ok) {
+      const perfil = await respMe.json();
+      status.className = "msg ok";
+      status.textContent = "Sesión activa detectada. Redirigiendo…";
+      btn.textContent = "Redirigiendo…";
+      redirigirSegunRol(perfil);
+      return;
+    }
+  } catch (err) {
+    console.warn("No se pudo validar sesión existente:", err);
+  }
+
+  // Token inválido o expirado sin posibilidad de renovar: limpiar almacenamiento
+  sessionStorage.removeItem("access_token");
+  sessionStorage.removeItem("refresh_token");
+  sessionStorage.removeItem("sede_actual");
+  try {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+  } catch (e) {}
+
+  status.className = "msg";
+  status.textContent = "";
+  btn.disabled = false;
+  btn.textContent = "Ingresar";
+}
+
+// Ejecutar comprobación automática inmediatamente al cargar el script
+verificarSesionExistente();
+
 async function iniciarSesion(username, password) {
   const respuesta = await fetch(`${urlserver}/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Accept": "application/json"
+      "Accept": "application/json",
     },
-    body: JSON.stringify({
-      username,
-      password
-    })
+    body: JSON.stringify({ username, password }),
   });
 
-  // Leer la respuesta del servidor
-  const resultado = await respuesta.json();
+  const texto = await respuesta.text();
+  let resultado = {};
+
+  try {
+    resultado = texto ? JSON.parse(texto) : {};
+  } catch {
+    resultado = {
+      detail: texto || "Respuesta no válida del servidor.",
+    };
+  }
 
   if (!respuesta.ok) {
     throw new Error(
@@ -68,15 +166,12 @@ async function iniciarSesion(username, password) {
   return resultado;
 }
 
-// Manejar el envío del formulario
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
 
-  // Limpiar mensajes anteriores
   status.className = "msg";
   status.textContent = "";
 
-  // Validar usuario
   const isUserValid = check(
     "f-user",
     "m-user",
@@ -84,7 +179,6 @@ form.addEventListener("submit", async (e) => {
     "Escribe tu usuario."
   );
 
-  // Validar contraseña
   const isPassValid = check(
     "f-pass",
     "m-pass",
@@ -102,7 +196,6 @@ form.addEventListener("submit", async (e) => {
     return;
   }
 
-  // Deshabilitar el botón durante la petición
   btn.disabled = true;
   btn.textContent = "Ingresando…";
 
@@ -112,22 +205,45 @@ form.addEventListener("submit", async (e) => {
       pass.value
     );
 
-    console.log("Respuesta del servidor:", resultado);
-
-    if (!resultado.ok || !resultado.token) {
-      throw new Error("El servidor no confirmó el inicio de sesión.");
+    if (!resultado.access_token || !resultado.refresh_token) {
+      throw new Error(
+        "El servidor no devolvió los tokens esperados."
+      );
     }
 
-    // Guardar el token para utilizarlo en futuras peticiones.
-    // Esto es una implementación básica; para producción,
-    // considera una cookie HttpOnly y Secure.
-    sessionStorage.setItem("token", resultado.token);
+    sessionStorage.setItem(
+      "access_token",
+      resultado.access_token
+    );
+
+    sessionStorage.setItem(
+      "refresh_token",
+      resultado.refresh_token
+    );
 
     status.className = "msg ok";
     status.textContent = "Sesión iniciada correctamente.";
 
-    // Redirigir al panel
-    window.location.href = "/panel";
+    // Consultar tipo de usuario para redirigir al panel correspondiente
+    try {
+      const respMe = await fetch(`${urlserver}/me`, {
+        headers: {
+          "Authorization": `Bearer ${resultado.access_token}`,
+          "Accept": "application/json",
+        },
+        cache: "no-store",
+      });
+      if (respMe.ok) {
+        const perfil = await respMe.json();
+        redirigirSegunRol(perfil);
+        return;
+      }
+    } catch (e) {
+      // Si falla la consulta a /me, proceder por defecto
+    }
+
+    window.location.replace("home/index.html");
+
 
   } catch (error) {
     console.error("Error en el inicio de sesión:", error);
@@ -135,7 +251,7 @@ form.addEventListener("submit", async (e) => {
     status.className = "msg error";
     status.textContent =
       error instanceof TypeError
-        ? "No se pudo conectar con el servidor. Comprueba la conexión."
+        ? "No se pudo conectar con el servidor."
         : error.message || "No se pudo iniciar sesión.";
 
   } finally {

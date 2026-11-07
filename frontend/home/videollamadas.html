@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CFS-Admin · Videollamadas</title>
+<link rel="stylesheet" href="dashboard.css">
+<link rel="stylesheet" href="videollamadas.css">
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i class="s s1"></i><i class="s s2"></i><i class="s s3"></i></div>
+
+<header class="top">
+  <div class="top-nav-left">
+    <button class="ghost btn-back" id="btn-volver" type="button">← Volver</button>
+    <div class="brand"><span class="mark">CFS</span><b>Videollamadas</b></div>
+  </div>
+  <div class="user-info" id="user-badge" hidden>
+    <span class="user-name" id="user-name">Cargando…</span>
+    <span class="user-tag" id="user-role">CFS</span>
+  </div>
+  <div class="actions">
+    <button class="ghost" id="theme" type="button" aria-label="Cambiar tema">Tema</button>
+    <button class="ghost" id="logout" type="button">Salir</button>
+  </div>
+</header>
+
+<main class="wrap" id="inbox-app" hidden>
+  <section class="head">
+    <div>
+      <h1>Bandeja de videollamadas</h1>
+      <p class="lead">Recibe, acepta o rechaza solicitudes de videollamada de tu sede o de otras sedes por UID.</p>
+    </div>
+    <button class="btn" id="btn-nueva-videollamada" type="button">+ Nueva videollamada</button>
+  </section>
+
+  <div class="aviso" id="aviso-servicio" hidden>
+    Tu servicio de videollamada está deshabilitado. El administrador debe habilitarlo para que puedas iniciar o aceptar llamadas.
+  </div>
+
+  <nav class="inbox-tabs" role="tablist" aria-label="Tipo de invitaciones">
+    <button class="tab-video on" id="tab-recibidas" type="button" role="tab" aria-selected="true">
+      Recibidas <span class="contador" id="badge-recibidas">0</span>
+    </button>
+    <button class="tab-video" id="tab-enviadas" type="button" role="tab" aria-selected="false">
+      Enviadas
+    </button>
+  </nav>
+
+  <section aria-live="polite">
+    <div id="lista-invitaciones" class="invitaciones-grid">
+      <p class="empty">Cargando invitaciones…</p>
+    </div>
+  </section>
+</main>
+
+<!-- Modal: Nueva videollamada -->
+<div class="modal-backdrop" id="modal-nueva" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-nueva">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="titulo-nueva">Nueva videollamada</h2>
+      <button class="modal-close" id="btn-cerrar-modal" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <p class="modal-sub">Elige un contacto de tu sede o pega el UID completo de un usuario de otra sede.</p>
+
+    <div class="modo-selector" role="tablist" aria-label="Método de invitación">
+      <button class="modo-btn on" id="modo-contacto" type="button" role="tab" aria-selected="true">Misma sede</button>
+      <button class="modo-btn" id="modo-uid" type="button" role="tab" aria-selected="false">Otra sede por UID</button>
+    </div>
+
+    <div class="form-msg" id="modal-msg" hidden></div>
+
+    <form id="form-nueva-videollamada" novalidate>
+      <div id="panel-contacto">
+        <div class="form-group">
+          <label for="select-contacto">Contacto <span class="req">*</span></label>
+          <select id="select-contacto">
+            <option value="">Cargando contactos…</option>
+          </select>
+          <small class="hint">Solo se muestran contactos formalizados con videollamada habilitada.</small>
+        </div>
+      </div>
+
+      <div id="panel-uid" hidden>
+        <div class="form-group">
+          <label for="input-uid">UID de la otra sede <span class="req">*</span></label>
+          <input type="text" id="input-uid" maxlength="36" autocomplete="off" spellcheck="false"
+                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+          <small class="hint">El UID debe estar completo. No se permite buscar por prefijo ni por username entre sedes.</small>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="ghost" id="btn-cancelar-nueva" type="button">Cancelar</button>
+        <button class="btn" id="btn-crear-invitacion" type="submit">Enviar invitación</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script type="module" src="videollamadas.js"></script>
+</body>
+</html>

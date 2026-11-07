@@ -1,10 +1,10 @@
+slowapi
 fastapi
-uvicorn
-psycopg
-sqlalchemy
+alembic
+argon2-cffi
 PyJWT[crypto]
-python-dotenv
-pwdlib[argon2]
-email-validator
-psycopg[binary]
+sqlalchemy>=2.0
+psycopg2-binary
+uvicorn[standard]
 pydantic-settings
+websockets
