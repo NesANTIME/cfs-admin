@@ -1,0 +1,50 @@
+/* Bandeja de videollamadas */
+
+.inbox-tabs{display:flex;gap:10px;margin:22px 0;border-bottom:2px solid rgba(255,255,255,.2);padding-bottom:12px;overflow-x:auto}
+.tab-video{height:42px;padding:0 20px;border:1px solid rgba(255,255,255,.3);border-radius:8px;background:rgba(0,0,0,.18);color:#fff;font:inherit;font-size:.92rem;font-weight:700;cursor:pointer;white-space:nowrap}
+.tab-video:hover{background:rgba(255,255,255,.18);border-color:#fff}
+.tab-video.on{background:var(--card);color:var(--ink);border-color:var(--yellow);border-top:3px solid var(--yellow);box-shadow:0 4px 10px rgba(0,0,0,.25)}
+.contador{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--yellow);color:#141414;font-size:.75rem;font-weight:800}
+.tab-video.on .contador{background:var(--green);color:#fff}
+
+.aviso{padding:14px 18px;margin-bottom:18px;border-radius:10px;background:var(--warnbg);color:var(--warn);border-left:5px solid var(--warn);font-weight:600;font-size:.92rem}
+
+.invitaciones-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:18px}
+.invitacion-card{display:flex;flex-direction:column;gap:14px;padding:20px;background:var(--card);border:1px solid var(--line);border-top:5px solid var(--yellow);border-radius:12px;box-shadow:0 8px 0 rgba(0,0,0,.24)}
+.invitacion-card.aceptada{border-top-color:var(--ok)}
+.invitacion-card.rechazada,.invitacion-card.cancelada,.invitacion-card.expirada{border-top-color:var(--muted);opacity:.82}
+.inv-top{display:flex;align-items:center;gap:12px}
+.inv-avatar{display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--green);color:#fff;font-size:1.2rem;font-weight:800;flex:none}
+.inv-id{min-width:0}
+.inv-nombre{margin:0;font-size:1.05rem;font-weight:800;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inv-meta{margin:2px 0 0;font-size:.82rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inv-estado{align-self:flex-start;padding:4px 10px;border-radius:999px;font-size:.76rem;font-weight:800;background:var(--warnbg);color:var(--warn)}
+.inv-estado.ok{background:var(--okbg);color:var(--ok)}
+.inv-estado.off{background:var(--downbg);color:var(--danger)}
+.inv-uid{margin:0;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.05);font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:.78rem;color:var(--muted);word-break:break-all}
+:root[data-theme="dark"] .inv-uid{background:rgba(255,255,255,.08)}
+.inv-tiempo{margin:0;font-size:.84rem;font-weight:600;color:var(--muted)}
+.inv-acciones{display:flex;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
+.inv-acciones .btn,.inv-acciones .ghost{height:38px;padding:0 16px;font-size:.86rem}
+.btn-accept{background:var(--ok);color:#fff}
+.btn-reject{background:transparent;color:var(--danger);border-color:var(--danger)}
+.btn-reject:hover{border-color:var(--danger);filter:brightness(.95)}
+
+.modo-selector{display:flex;gap:8px;margin-bottom:18px;padding:4px;border-radius:10px;background:rgba(0,0,0,.05)}
+:root[data-theme="dark"] .modo-selector{background:rgba(255,255,255,.08)}
+.modo-btn{flex:1;height:38px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:.86rem;font-weight:700;cursor:pointer}
+.modo-btn.on{background:var(--card);color:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.16)}
+
+select{width:100%;height:44px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-size:.92rem}
+select:focus{outline:0;border-color:var(--green);box-shadow:0 0 0 3px color-mix(in srgb,var(--yellow) 55%,transparent)}
+.hint{color:var(--muted);font-size:.78rem;line-height:1.35}
+
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:80;max-width:min(92vw,520px);padding:12px 18px;border-radius:10px;background:#141414;color:#fff;font-size:.9rem;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.toast.error{background:var(--danger);color:#fff}
+.toast.ok{background:var(--green);color:#fff}
+
+@media (max-width:640px){
+  .invitaciones-grid{grid-template-columns:1fr}
+  .head{align-items:stretch}
+  .head .btn{width:100%}
+}

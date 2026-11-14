@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CFS-Admin · Chat Intra-Sede</title>
+<link rel="stylesheet" href="dashboard.css">
+<link rel="stylesheet" href="chat.css">
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i class="s s1"></i><i class="s s2"></i><i class="s s3"></i></div>
+
+<header class="top">
+  <div class="top-nav-left">
+    <button class="ghost btn-back" id="btn-volver" type="button">← Volver</button>
+    <div class="brand"><span class="mark">CFS</span><b>Chat Intra-Sede</b></div>
+  </div>
+  <div class="user-info" id="user-badge" hidden>
+    <span class="user-name" id="user-name">Cargando…</span>
+    <span class="user-tag" id="user-role">CFS</span>
+  </div>
+  <div class="actions">
+    <button class="ghost" id="theme" type="button" aria-label="Cambiar tema">Tema</button>
+    <button class="ghost" id="logout" type="button">Salir</button>
+  </div>
+</header>
+
+<main class="chat-app" id="chat-app" hidden>
+  <!-- Barra lateral: Contactos y Búsqueda por Username o UID -->
+  <aside class="chat-sidebar card">
+    <div class="sidebar-header">
+      <h2>Mis Contactos</h2>
+      <button class="btn btn-sm" id="btn-modal-agregar-uid" type="button" title="Añadir contacto">+ Añadir</button>
+    </div>
+
+    <div class="sidebar-search">
+      <input type="search" id="q-contactos" placeholder="Filtrar contactos…" aria-label="Buscar contacto">
+    </div>
+
+    <!-- Lista de contactos -->
+    <div class="contacts-list" id="contacts-list">
+      <p class="empty">No tienes contactos en tu sede todavía. Agrega uno con su Username o UID.</p>
+    </div>
+  </aside>
+
+  <!-- Área principal de conversación -->
+  <section class="chat-main card">
+    <!-- Estado sin conversación activa -->
+    <div class="chat-placeholder" id="chat-placeholder">
+      <div class="placeholder-icon">💬</div>
+      <h2>Selecciona un contacto para chatear</h2>
+      <p>Comunícate en tiempo real con miembros de tu misma sede o añade un contacto por nombre de usuario o UID.</p>
+    </div>
+
+    <!-- Conversación activa -->
+    <div class="chat-conversation" id="chat-conversation" hidden>
+      <!-- Cabecera de la conversación -->
+      <div class="chat-conv-header">
+        <div class="conv-user-info">
+          <div class="conv-avatar" id="conv-avatar">👤</div>
+          <div>
+            <h3 class="conv-name" id="conv-name">Contacto</h3>
+            <div class="conv-meta">
+              <span class="pill" id="conv-status-pill">Desconectado</span>
+              <span class="conv-sede" id="conv-sede-tag">Sede</span>
+              <span class="mono conv-uid" id="conv-uid-tag">UID: —</span>
+            </div>
+          </div>
+        </div>
+        <div class="conv-actions">
+          <button class="btn btn-sm" id="btn-iniciar-videollamada" type="button" title="Iniciar llamada de video con este contacto" disabled>📹 Videollamada</button>
+        </div>
+      </div>
+
+      <!-- Banner de formalización y aceptación de solicitud -->
+      <div class="formalizar-banner" id="formalizar-banner" hidden>
+        <div class="formalizar-info">
+          <span class="formalizar-icon">⚠️</span>
+          <span id="formalizar-texto">Solicitud pendiente: Acepta la solicitud para formalizar el contacto y habilitar el chat bidireccional y videollamadas.</span>
+        </div>
+        <div class="formalizar-actions">
+          <button class="btn btn-sm btn-accept" id="btn-aceptar-solicitud" type="button">✅ Aceptar Solicitud</button>
+          <button class="ghost btn-sm btn-reject" id="btn-rechazar-solicitud" type="button">❌ Rechazar</button>
+        </div>
+      </div>
+
+      <!-- Historial de mensajes -->
+      <div class="chat-messages" id="chat-messages">
+        <!-- Renderizado dinámico de burbujas -->
+      </div>
+
+      <!-- Barra de envío con soporte para texto e imágenes -->
+      <form class="chat-input-bar" id="form-chat" novalidate>
+        <input type="file" id="input-chat-img" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+        <button type="button" class="btn-attach" id="btn-adjuntar-img" title="Adjuntar imagen" aria-label="Adjuntar imagen">📷</button>
+        <input type="text" id="input-mensaje" placeholder="Escribe un mensaje seguro…" autocomplete="off" maxlength="5000">
+        <button class="btn" id="btn-enviar-msg" type="submit">Enviar</button>
+      </form>
+    </div>
+  </section>
+</main>
+
+<!-- Modal: Añadir Contacto por Username o UID -->
+<div class="modal-backdrop" id="modal-agregar-contacto" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-uid">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="titulo-modal-uid">Añadir Contacto</h2>
+      <button class="modal-close" id="btn-cerrar-modal-uid" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <p class="modal-sub">Ingresa el nombre de usuario o UID único de un miembro de tu misma sede.</p>
+    
+    <form id="form-agregar-uid" novalidate>
+      <div class="form-group autocomplete-container">
+        <label for="input-uid">Usuario o UID <span class="req">*</span></label>
+        <input type="text" id="input-uid" required maxlength="50" placeholder="Escribe username o pega UID..." autocomplete="off">
+        <div class="autocomplete-dropdown" id="autocomplete-dropdown" hidden>
+          <div class="autocomplete-list" id="autocomplete-list"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="input-alias">Alias o apodo local (opcional)</label>
+        <input type="text" id="input-alias" placeholder="Ej: Ingeniero de Enlace" maxlength="100">
+      </div>
+
+      <div class="form-msg" id="msg-agregar-uid" role="alert" hidden></div>
+
+      <div class="modal-actions">
+        <button class="ghost" id="btn-cancelar-uid" type="button">Cancelar</button>
+        <button class="btn" id="btn-submit-uid" type="submit">Añadir contacto</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="module" src="chat.js"></script>
+</body>
+</html>

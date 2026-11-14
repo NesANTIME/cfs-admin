@@ -1,0 +1,84 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: cfcs-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE__DB:-${POSTGRES_DB:-cfcs_db}}
+      POSTGRES_USER: ${DATABASE__USER:-${POSTGRES_USER:-postgres}}
+      POSTGRES_PASSWORD: ${DATABASE__PASSWORD:-${POSTGRES_PASSWORD:-postgres}}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DATABASE__PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE__USER:-${POSTGRES_USER:-postgres}} -d ${DATABASE__DB:-${POSTGRES_DB:-cfcs_db}}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cfcs_network
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: DockerFile
+    container_name: cfcs-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Escuchar en todas las interfaces dentro del contenedor
+      RED__HOST: "0.0.0.0"
+      RED__PORT: "8000"
+      # IP asignada al proxy Apache (web) en la red interna
+      RED__TRUSTED_PROXIES: "${RED__TRUSTED_PROXIES:-172.28.0.10}"
+      # Conexión a la base de datos PostgreSQL
+      DATABASE__HOST: "db"
+      DATABASE__PORT: "5432"
+      DATABASE__USER: "${DATABASE__USER:-${POSTGRES_USER:-postgres}}"
+      DATABASE__PASSWORD: "${DATABASE__PASSWORD:-${POSTGRES_PASSWORD:-postgres}}"
+      DATABASE__DB: "${DATABASE__DB:-${POSTGRES_DB:-cfcs_db}}"
+      DATABASE__SQLECHO: "${DATABASE__SQLECHO:-false}"
+      # Clave JWT (debe tener al menos 32 caracteres y suficiente entropía)
+      JWT__SECRET_KEY: "${JWT__SECRET_KEY:-cfcs_secret_key_super_segura_para_desarrollo_2026_xyz}"
+      JWT__ALGORITHM: "${JWT__ALGORITHM:-HS256}"
+      # Administrador predeterminado inicial
+      ADMIN_DEFAULT_PASSWORD: "${ADMIN_DEFAULT_PASSWORD:-admincfs}"
+    # Ejecuta migraciones de Alembic y crea el usuario admin inicial antes de arrancar uvicorn
+    command: >
+      sh -c "python -c 'from db.controller import MigrateDatabase; MigrateDatabase(); from db.admin import asegurarAdminPredeterminado; asegurarAdminPredeterminado()' && python cfcs-core.py"
+    expose:
+      - "8000"
+    networks:
+      - cfcs_network
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/DockerFile
+    container_name: cfcs-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${PORT_WEB:-8080}:80"
+    networks:
+      cfcs_network:
+        ipv4_address: 172.28.0.10
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  cfcs_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
