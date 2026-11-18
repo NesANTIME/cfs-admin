@@ -19,6 +19,9 @@ class Contacto(Base):
         ForeignKey("empleados.id_empleado", ondelete="CASCADE"), index=True
     )
     alias: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    id_iniciador: Mapped[int | None] = mapped_column(
+        ForeignKey("empleados.id_empleado", ondelete="SET NULL"), nullable=True
+    )
     registrado_formalmente: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )
@@ -29,6 +32,7 @@ class Contacto(Base):
     # Relaciones
     usuario: Mapped["Empleado"] = relationship(foreign_keys=[id_usuario])
     contacto: Mapped["Empleado"] = relationship(foreign_keys=[id_contacto])
+    iniciador: Mapped["Empleado | None"] = relationship(foreign_keys=[id_iniciador])
 
     __table_args__ = (
         UniqueConstraint("id_usuario", "id_contacto", name="uq_contactos_usuario_contacto"),

@@ -162,7 +162,7 @@ function renderContactos() {
   const t = (state.filtroContactos || "").toLowerCase();
 
   const filtrados = state.contactos.filter((c) =>
-    ((c.nombre || "") + " " + (c.usuario || "") + " " + (c.uid_publico || "")).toLowerCase().includes(t)
+    ((c.nombre || "") + " " + (c.alias || "") + " " + (c.nombre_real || "") + " " + (c.usuario || "") + " " + (c.uid_publico || "")).toLowerCase().includes(t)
   );
 
   if (filtrados.length === 0) {
@@ -176,10 +176,21 @@ function renderContactos() {
   list.innerHTML = filtrados.map((c) => {
     const esActivo = state.contactoActivo && state.contactoActivo.id_empleado === c.id_empleado;
     const dotClass = c.en_linea ? "online" : "offline";
-    const formalBadge = !c.registrado_formalmente
-      ? `<span class="contact-badge-formal">Solicitud pendiente</span>`
-      : "";
+    
+    let formalBadge = "";
+    if (!c.registrado_formalmente) {
+      if (c.es_solicitante) {
+        formalBadge = `<span class="contact-badge-pending" style="background:#e0f2fe;color:#0369a1;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">Solicitud enviada</span>`;
+      } else {
+        formalBadge = `<span class="contact-badge-formal" style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">⚠️ Solicitud entrante</span>`;
+      }
+    }
+
     const uidCorto = c.uid_publico ? `${c.uid_publico.substring(0, 8)}…` : "—";
+    const nombreMostrar = c.alias || c.nombre || `@${c.usuario}`;
+    const subInfo = c.alias
+      ? `${esc(c.nombre_real || c.nombre)} (@${esc(c.usuario)}) · ${esc(c.sede_nombre || "Sede")}`
+      : `${esc(c.sede_nombre || "Sede")} · ${esc(uidCorto)}`;
 
     return `
       <div class="contact-item ${esActivo ? "active" : ""}" data-id="${c.id_empleado}" tabindex="0">
@@ -188,8 +199,8 @@ function renderContactos() {
           <span class="status-dot ${dotClass}" title="${c.en_linea ? "En línea" : "Desconectado"}"></span>
         </div>
         <div class="contact-info">
-          <div class="contact-name">${esc(c.nombre)} ${formalBadge}</div>
-          <div class="contact-sub">${esc(c.sede_nombre || "Sede")} · ${esc(uidCorto)}</div>
+          <div class="contact-name">${esc(nombreMostrar)} ${formalBadge}</div>
+          <div class="contact-sub">${subInfo}</div>
         </div>
       </div>
     `;
@@ -233,11 +244,18 @@ function renderHeaderConversacion() {
   const c = state.contactoActivo;
   if (!c) return;
 
-  $("#conv-name").textContent = c.nombre;
+  const nombreMostrar = c.alias ? `${c.alias} (${c.nombre_real || c.nombre})` : (c.nombre || `@${c.usuario}`);
+  $("#conv-name").textContent = nombreMostrar;
   $("#conv-sede-tag").textContent = c.sede_nombre || "Sede";
   $("#conv-uid-tag").textContent = `UID: ${c.uid_publico || "—"}`;
 
   const statusPill = $("#conv-status-pill");
+  const btnAceptar = $("#btn-aceptar-solicitud");
+  const btnRechazar = $("#btn-rechazar-solicitud");
+  const banner = $("#formalizar-banner");
+  const textoBanner = $("#formalizar-texto");
+  const iconoBanner = $(".formalizar-icon");
+
   if (c.registrado_formalmente) {
     if (c.en_linea) {
       statusPill.className = "pill up";
@@ -246,7 +264,7 @@ function renderHeaderConversacion() {
       statusPill.className = "pill down";
       statusPill.textContent = "Desconectado";
     }
-    $("#formalizar-banner").hidden = true;
+    banner.hidden = true;
     const tieneVideo = Array.isArray(c.servicios) && c.servicios.includes("videoconferencia");
     const btnVideo = $("#btn-iniciar-videollamada");
     btnVideo.disabled = !tieneVideo;
@@ -254,26 +272,65 @@ function renderHeaderConversacion() {
       ? "Iniciar videollamada"
       : "Este contacto no tiene el servicio de videollamada habilitado";
   } else {
-    statusPill.className = "pill warn";
-    statusPill.textContent = "Solicitud pendiente";
-    $("#formalizar-banner").hidden = false;
+    // Relación pendiente
     $("#btn-iniciar-videollamada").disabled = true;
+
+    if (c.es_solicitante) {
+      // El usuario actual fue quien envió la solicitud
+      statusPill.className = "pill info";
+      statusPill.textContent = "Solicitud enviada";
+      banner.hidden = false;
+      if (iconoBanner) iconoBanner.textContent = "⏳";
+      if (textoBanner) {
+        textoBanner.textContent = `Solicitud enviada a @${c.usuario}: Esperando que acepte tu solicitud para habilitar el chat bidireccional y videollamadas.`;
+      }
+      if (btnAceptar) btnAceptar.hidden = true;
+      if (btnRechazar) {
+        btnRechazar.textContent = "❌ Cancelar Solicitud";
+        btnRechazar.title = "Cancelar la solicitud de contacto enviada";
+      }
+    } else {
+      // El usuario actual RECIBIÓ la solicitud / contacto desconocido
+      statusPill.className = "pill warn";
+      statusPill.textContent = "Contacto desconocido";
+      banner.hidden = false;
+      if (iconoBanner) iconoBanner.textContent = "⚠️";
+      if (textoBanner) {
+        textoBanner.textContent = `Contacto desconocido: @${c.usuario} te ha añadido a sus contactos. Acepta la solicitud para formalizar el enlace y chatear con él.`;
+      }
+      if (btnAceptar) {
+        btnAceptar.hidden = false;
+        btnAceptar.textContent = "✅ Aceptar Contacto";
+      }
+      if (btnRechazar) {
+        btnRechazar.textContent = "❌ Rechazar";
+        btnRechazar.title = "Rechazar solicitud y descartar contacto";
+      }
+    }
   }
 
   actualizarComposer();
 }
 
 function actualizarComposer() {
-  const habilitado = Boolean(state.contactoActivo && state.contactoActivo.registrado_formalmente);
+  const c = state.contactoActivo;
+  const habilitado = Boolean(c && c.registrado_formalmente);
   const input = $("#input-mensaje");
   const btnEnviar = $("#btn-enviar-msg");
   const btnAdjuntar = $("#btn-adjuntar-img");
 
+  let placeholderTexto = "Escribe un mensaje seguro…";
+  if (!habilitado) {
+    if (c && c.es_solicitante) {
+      placeholderTexto = `Esperando que @${c.usuario} acepte tu solicitud de contacto…`;
+    } else {
+      placeholderTexto = "Acepta el contacto para habilitar el chat…";
+    }
+  }
+
   if (input) {
     input.disabled = !habilitado;
-    input.placeholder = habilitado
-      ? "Escribe un mensaje seguro…"
-      : "Acepta la solicitud para habilitar el chat…";
+    input.placeholder = placeholderTexto;
   }
   if (btnEnviar) btnEnviar.disabled = !habilitado;
   if (btnAdjuntar) btnAdjuntar.disabled = !habilitado;
@@ -305,7 +362,11 @@ async function aceptarSolicitudContacto() {
 
 async function rechazarSolicitudContacto() {
   if (!state.contactoActivo) return;
-  if (!confirm(`¿Deseas rechazar o eliminar a ${state.contactoActivo.nombre} de tus contactos?`)) return;
+  const esSol = state.contactoActivo.es_solicitante;
+  const textoConfirm = esSol
+    ? `¿Deseas cancelar la solicitud enviada a ${state.contactoActivo.nombre}?`
+    : `¿Deseas rechazar a ${state.contactoActivo.nombre} de tus contactos?`;
+  if (!confirm(textoConfirm)) return;
   const relId = state.contactoActivo.id_contacto_rel;
   const btn = $("#btn-rechazar-solicitud");
   if (btn) btn.disabled = true;
@@ -322,10 +383,10 @@ async function rechazarSolicitudContacto() {
       actualizarComposer();
       await cargarContactos();
     } else {
-      alert("No se pudo eliminar el contacto.");
+      alert("No se pudo procesar la acción.");
     }
   } catch (e) {
-    console.error("Error al rechazar contacto:", e);
+    console.error("Error al rechazar/cancelar contacto:", e);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -704,6 +765,36 @@ const btnAceptarSolicitud = $("#btn-aceptar-solicitud");
 if (btnAceptarSolicitud) btnAceptarSolicitud.addEventListener("click", aceptarSolicitudContacto);
 const btnRechazarSolicitud = $("#btn-rechazar-solicitud");
 if (btnRechazarSolicitud) btnRechazarSolicitud.addEventListener("click", rechazarSolicitudContacto);
+
+async function editarAliasContacto() {
+  if (!state.contactoActivo) return;
+  const c = state.contactoActivo;
+  const aliasActual = c.alias || "";
+  const nuevoAlias = prompt(
+    `Editar sobrenombre para @${c.usuario}:\n(Deja vacío si deseas remover el sobrenombre y mostrar el nombre oficial)`,
+    aliasActual
+  );
+  if (nuevoAlias === null) return;
+
+  try {
+    const res = await apiFetch(`/contactos/${c.id_contacto_rel}/alias`, {
+      method: "PATCH",
+      body: JSON.stringify({ alias: nuevoAlias.trim() || null }),
+    });
+    if (res && res.ok) {
+      await cargarContactos();
+      const ref = state.contactos.find((x) => x.id_contacto_rel === c.id_contacto_rel);
+      if (ref) seleccionarContacto(ref);
+    } else {
+      alert("No se pudo actualizar el sobrenombre.");
+    }
+  } catch (e) {
+    alert("Error de conexión al actualizar el sobrenombre.");
+  }
+}
+
+const btnEditAlias = $("#btn-editar-alias-header");
+if (btnEditAlias) btnEditAlias.addEventListener("click", editarAliasContacto);
 
 $("#btn-iniciar-videollamada").addEventListener("click", async () => {
   const contacto = state.contactoActivo;

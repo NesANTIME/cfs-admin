@@ -1,0 +1,16 @@
+{
+  "uid": "UID-63e247-MTkyLjE2OC4xLjg-f70147",
+  "nombre": "Access Point Empresarial UniFi U6-Pro",
+  "tipo": "Access Point",
+  "direccion_ip": "192.168.1.8",
+  "mac": "00:1A:2B:A4:B2:4D",
+  "contrasena": "cfs12345",
+  "contrasena_hash": "c9797faea6347385061224616d5524149180c3cba3d1ac40f9ab9038e78b24c8",
+  "vinculado": false,
+  "id_sede": null,
+  "sede_nombre": null,
+  "creado_en": "2026-11-18T15:36:45.710996+00:00",
+  "descripcion": "Equipo Access Point simulado por CFS-Client en host ArchSystem",
+  "puerto": 8500,
+  "api_url": "http://localhost:8080/api"
+}

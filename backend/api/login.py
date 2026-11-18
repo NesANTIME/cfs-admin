@@ -142,12 +142,12 @@ def _me(user: Annotated[Empleado, Depends(getCurrentUser)], db: Annotated[Sessio
         "es_admin_s": tipo_admin == "admin-s",
         "direccion": user.direccion if isinstance(user, UsuarioSede) else None,
         "servicios": [
-            {"tipo_servicio": s.tipo_servicio, "habilitado": s.habilitado if tipo_admin != "admin-g" else True}
+            {"tipo_servicio": s.tipo_servicio, "habilitado": s.habilitado if tipo_admin not in ("admin-g", "admin-s") else True}
             for s in user.servicios_usuario
             if id_sede is None or s.id_sede == id_sede or s.id_sede is None
         ] if user.servicios_usuario else (
             [{"tipo_servicio": "videoconferencia", "habilitado": True}, {"tipo_servicio": "chat", "habilitado": True}]
-            if tipo_admin == "admin-g" else []
+            if tipo_admin in ("admin-g", "admin-s") else []
         ),
     }
 

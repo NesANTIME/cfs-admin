@@ -4,15 +4,15 @@ services:
     container_name: cfcs-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DATABASE__DB:-${POSTGRES_DB:-cfcs_db}}
-      POSTGRES_USER: ${DATABASE__USER:-${POSTGRES_USER:-postgres}}
-      POSTGRES_PASSWORD: ${DATABASE__PASSWORD:-${POSTGRES_PASSWORD:-postgres}}
+      POSTGRES_DB: ${DATABASE__DB:-cfcs_db}
+      POSTGRES_USER: ${DATABASE__USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE__PASSWORD:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "${DATABASE__PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE__USER:-${POSTGRES_USER:-postgres}} -d ${DATABASE__DB:-${POSTGRES_DB:-cfcs_db}}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE__USER:-postgres} -d ${DATABASE__DB:-cfcs_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -32,24 +32,26 @@ services:
       - path: .env
         required: false
     environment:
-      # Escuchar en todas las interfaces dentro del contenedor
       RED__HOST: "0.0.0.0"
-      RED__PORT: "8000"
-      # IP asignada al proxy Apache (web) en la red interna
+      RED__PORT: "${RED__PORT:-8000}"
       RED__TRUSTED_PROXIES: "${RED__TRUSTED_PROXIES:-172.28.0.10}"
-      # Conexión a la base de datos PostgreSQL
       DATABASE__HOST: "db"
-      DATABASE__PORT: "5432"
-      DATABASE__USER: "${DATABASE__USER:-${POSTGRES_USER:-postgres}}"
-      DATABASE__PASSWORD: "${DATABASE__PASSWORD:-${POSTGRES_PASSWORD:-postgres}}"
-      DATABASE__DB: "${DATABASE__DB:-${POSTGRES_DB:-cfcs_db}}"
+      DATABASE__PORT: "${DATABASE__PORT:-5432}"
+      DATABASE__USER: "${DATABASE__USER:-postgres}"
+      DATABASE__PASSWORD: "${DATABASE__PASSWORD:-postgres}"
+      DATABASE__DB: "${DATABASE__DB:-cfcs_db}"
       DATABASE__SQLECHO: "${DATABASE__SQLECHO:-false}"
-      # Clave JWT (debe tener al menos 32 caracteres y suficiente entropía)
       JWT__SECRET_KEY: "${JWT__SECRET_KEY:-cfcs_secret_key_super_segura_para_desarrollo_2026_xyz}"
       JWT__ALGORITHM: "${JWT__ALGORITHM:-HS256}"
-      # Administrador predeterminado inicial
+      JWT__ACCESS_TOKEN: "${JWT__ACCESS_TOKEN:-15}"
+      JWT__REFRESH_TOKEN: "${JWT__REFRESH_TOKEN:-7}"
+      CORS__ALLOW_ORIGINS: '${CORS__ALLOW_ORIGINS:-["http://localhost:3000","http://localhost:5173","http://localhost:8080"]}'
+      CORS__ALLOW_METHODS: '${CORS__ALLOW_METHODS:-["GET","POST","PATCH","DELETE","OPTIONS"]}'
+      CORS__ALLOW_HEADERS: '${CORS__ALLOW_HEADERS:-["Content-Type","Authorization"]}'
+      CORS__ALLOW_CREDENTIALS: "${CORS__ALLOW_CREDENTIALS:-false}"
+      VIDEOCONFERENCIA__INVITACION: "${VIDEOCONFERENCIA__INVITACION:-2}"
+      VIDEOCONFERENCIA__STUN_URLS: '${VIDEOCONFERENCIA__STUN_URLS:-["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]}'
       ADMIN_DEFAULT_PASSWORD: "${ADMIN_DEFAULT_PASSWORD:-admincfs}"
-    # Ejecuta migraciones de Alembic y crea el usuario admin inicial antes de arrancar uvicorn
     command: >
       sh -c "python -c 'from db.controller import MigrateDatabase; MigrateDatabase(); from db.admin import asegurarAdminPredeterminado; asegurarAdminPredeterminado()' && python cfcs-core.py"
     expose:

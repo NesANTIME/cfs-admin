@@ -169,6 +169,7 @@ class ContactoResponse(BaseModel):
     id_contacto_rel: int
     id_empleado: int
     nombre: str | None = None
+    nombre_real: str | None = None
     usuario: str | None = None
     uid_publico: str
     id_sede: int | None = None
@@ -176,7 +177,12 @@ class ContactoResponse(BaseModel):
     en_linea: bool = False
     registrado_formalmente: bool = False
     alias: str | None = None
+    id_iniciador: int | None = None
+    es_solicitante: bool = False
     servicios: list[str] = []
+
+class ContactoAliasUpdate(BaseModel):
+    alias: str | None = Field(None, max_length=100)
 
 
 # --- Chat ---

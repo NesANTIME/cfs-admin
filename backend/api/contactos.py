@@ -9,7 +9,7 @@ from core.deps import getCurrentUser, obtenerTipoAdmin
 from db.template.servicio_usuario import ServicioUsuario
 from db.template.empleado import Empleado, Tecnico, UsuarioSede
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from config.utils.request import ContactoAgregarRequest, ContactoResponse, ContactoBuscarResponse
+from config.utils.request import ContactoAgregarRequest, ContactoResponse, ContactoBuscarResponse, ContactoAliasUpdate
 
 router = APIRouter(prefix="/contactos", tags=["Contactos"])
 
@@ -134,24 +134,34 @@ def _listarContactos(
 
         id_sede_target = _obtenerSedeUsuario(target, db)
 
-        if tipo_admin != "admin-g" and (
+        tipo_target = obtenerTipoAdmin(target)
+        es_target_admin_g = (tipo_target == "admin-g")
+
+        if tipo_admin != "admin-g" and not es_target_admin_g and (
             id_sede_user is None or id_sede_target != id_sede_user
         ):
             continue
 
         sede_obj = db.get(Sede, id_sede_target) if id_sede_target else None
 
-        servicios_hab = [
-            s.tipo_servicio
-            for s in target.servicios_usuario
-            if s.habilitado and (id_sede_target is None or s.id_sede == id_sede_target)
-        ]
+        if obtenerTipoAdmin(target) in ("admin-g", "admin-s"):
+            servicios_hab = ["chat", "videoconferencia"]
+        else:
+            servicios_hab = [
+                s.tipo_servicio
+                for s in target.servicios_usuario
+                if s.habilitado and (id_sede_target is None or s.id_sede == id_sede_target)
+            ]
+
+        es_solicitante = bool(rel.id_iniciador == user.id_empleado)
+        nombre_mostrado = rel.alias.strip() if (rel.alias and rel.alias.strip()) else target.nombre
 
         if rel.registrado_formalmente:
             resultado.append({
                 "id_contacto_rel": rel.id,
                 "id_empleado": target.id_empleado,
-                "nombre": target.nombre,
+                "nombre": nombre_mostrado,
+                "nombre_real": target.nombre,
                 "usuario": target.usuario,
                 "uid_publico": target.uid_publico,
                 "id_sede": id_sede_target,
@@ -159,13 +169,17 @@ def _listarContactos(
                 "en_linea": bool(target.en_linea),
                 "registrado_formalmente": True,
                 "alias": rel.alias,
+                "id_iniciador": rel.id_iniciador,
+                "es_solicitante": es_solicitante,
                 "servicios": servicios_hab,
             })
         else:
+            nombre_pendiente = rel.alias.strip() if (rel.alias and rel.alias.strip()) else (target.nombre or f"@{target.usuario}")
             resultado.append({
                 "id_contacto_rel": rel.id,
                 "id_empleado": target.id_empleado,
-                "nombre": rel.alias or f"@{target.usuario} [{target.uid_publico[:8]}…]",
+                "nombre": nombre_pendiente,
+                "nombre_real": target.nombre,
                 "usuario": target.usuario,
                 "uid_publico": target.uid_publico,
                 "id_sede": None,
@@ -173,6 +187,8 @@ def _listarContactos(
                 "en_linea": False,
                 "registrado_formalmente": False,
                 "alias": rel.alias,
+                "id_iniciador": rel.id_iniciador,
+                "es_solicitante": es_solicitante,
                 "servicios": [],
             })
 
@@ -236,7 +252,8 @@ def _agregarContacto(
         )
 
     tipo_admin = obtenerTipoAdmin(user)
-    if tipo_admin != "admin-g":
+    tipo_target = obtenerTipoAdmin(target)
+    if tipo_admin != "admin-g" and tipo_target != "admin-g":
         sede_user = _obtenerSedeUsuario(user, db)
         sede_target = _obtenerSedeUsuario(target, db)
         if sede_user is None or sede_target is None or sede_user != sede_target:
@@ -244,6 +261,8 @@ def _agregarContacto(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Solo puedes contactar a usuarios que pertenezcan a tu misma sede.",
             )
+
+    alias_limpio = data.alias.strip() if (data.alias and data.alias.strip()) else None
 
     rel = db.scalars(
         select(Contacto).where(
@@ -256,15 +275,18 @@ def _agregarContacto(
         rel = Contacto(
             id_usuario=user.id_empleado,
             id_contacto=target.id_empleado,
-            alias=data.alias.strip() if data.alias else None,
+            alias=alias_limpio,
+            id_iniciador=user.id_empleado,
             registrado_formalmente=False,
         )
         db.add(rel)
         response.status_code = status.HTTP_201_CREATED
     else:
         response.status_code = status.HTTP_200_OK
-        if data.alias:
-            rel.alias = data.alias.strip()
+        if alias_limpio is not None:
+            rel.alias = alias_limpio
+        if rel.id_iniciador is None:
+            rel.id_iniciador = user.id_empleado
 
     rev = db.scalars(
         select(Contacto).where(
@@ -277,8 +299,11 @@ def _agregarContacto(
             id_usuario=target.id_empleado,
             id_contacto=user.id_empleado,
             alias=None,
+            id_iniciador=user.id_empleado,
             registrado_formalmente=False,
         ))
+    elif rev.id_iniciador is None:
+        rev.id_iniciador = user.id_empleado
 
     db.commit()
     db.refresh(rel)
@@ -292,10 +317,13 @@ def _agregarContacto(
         if s.habilitado and (id_sede_target is None or s.id_sede == id_sede_target)
     ]
 
+    nombre_mostrado = rel.alias.strip() if (rel.alias and rel.alias.strip()) else target.nombre
+
     return {
         "id_contacto_rel": rel.id,
         "id_empleado": target.id_empleado,
-        "nombre": target.nombre if rel.registrado_formalmente else (rel.alias or f"@{target.usuario} [{target.uid_publico[:8]}…]"),
+        "nombre": nombre_mostrado,
+        "nombre_real": target.nombre,
         "usuario": target.usuario,
         "uid_publico": target.uid_publico,
         "id_sede": id_sede_target if rel.registrado_formalmente else None,
@@ -303,6 +331,8 @@ def _agregarContacto(
         "en_linea": bool(target.en_linea) if rel.registrado_formalmente else False,
         "registrado_formalmente": rel.registrado_formalmente,
         "alias": rel.alias,
+        "id_iniciador": rel.id_iniciador,
+        "es_solicitante": True,
         "servicios": servicios_hab if rel.registrado_formalmente else [],
     }
 
@@ -338,12 +368,72 @@ def _aceptarContactoFormalmente(
     id_sede_target = _obtenerSedeUsuario(target, db) if target else None
     sede_obj = db.get(Sede, id_sede_target) if id_sede_target else None
 
+    nombre_mostrado = rel.alias.strip() if (rel.alias and rel.alias.strip()) else (target.nombre if target else "")
+
     return {
         "detalle": "Contacto aceptado y registrado formalmente con éxito.",
         "id_contacto_rel": rel.id,
-        "nombre": target.nombre if target else "",
+        "id_empleado": target.id_empleado if target else 0,
+        "nombre": nombre_mostrado,
+        "nombre_real": target.nombre if target else "",
         "sede": sede_obj.nombre if sede_obj else "",
+        "alias": rel.alias,
         "registrado_formalmente": True,
+        "es_solicitante": bool(rel.id_iniciador == user.id_empleado),
+    }
+
+
+@router.patch("/{id_contacto_rel}/alias", response_model=ContactoResponse)
+def _actualizarAliasContacto(
+    id_contacto_rel: int,
+    data: ContactoAliasUpdate,
+    user: Annotated[Empleado, Depends(getCurrentUser)],
+    db: Annotated[Session, Depends(GetDatabase)],
+):
+    rel = db.get(Contacto, id_contacto_rel)
+    if rel is None or rel.id_usuario != user.id_empleado:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Relación de contacto no encontrada.",
+        )
+
+    rel.alias = data.alias.strip() if (data.alias and data.alias.strip()) else None
+    db.commit()
+    db.refresh(rel)
+
+    target = db.get(Empleado, rel.id_contacto)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Contacto no encontrado.")
+
+    id_sede_target = _obtenerSedeUsuario(target, db)
+    sede_obj = db.get(Sede, id_sede_target) if id_sede_target else None
+
+    if obtenerTipoAdmin(target) in ("admin-g", "admin-s"):
+        servicios_hab = ["chat", "videoconferencia"]
+    else:
+        servicios_hab = [
+            s.tipo_servicio
+            for s in target.servicios_usuario
+            if s.habilitado and (id_sede_target is None or s.id_sede == id_sede_target)
+        ]
+
+    nombre_mostrado = rel.alias.strip() if (rel.alias and rel.alias.strip()) else target.nombre
+
+    return {
+        "id_contacto_rel": rel.id,
+        "id_empleado": target.id_empleado,
+        "nombre": nombre_mostrado,
+        "nombre_real": target.nombre,
+        "usuario": target.usuario,
+        "uid_publico": target.uid_publico,
+        "id_sede": id_sede_target if rel.registrado_formalmente else None,
+        "sede_nombre": sede_obj.nombre if sede_obj else "Sede",
+        "en_linea": bool(target.en_linea),
+        "registrado_formalmente": rel.registrado_formalmente,
+        "alias": rel.alias,
+        "id_iniciador": rel.id_iniciador,
+        "es_solicitante": bool(rel.id_iniciador == user.id_empleado),
+        "servicios": servicios_hab if rel.registrado_formalmente else [],
     }
 
 

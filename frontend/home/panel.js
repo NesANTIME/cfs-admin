@@ -527,6 +527,15 @@ async function iniciar() {
   userBadge.hidden = false;
   $("#panel").hidden = false;
 
+  const btnChat = $("#btn-ir-chat");
+  const btnVideo = $("#btn-ir-video");
+  const btnLogs = $("#btn-ir-logs");
+  const esAdmin = u.tipo_admin === "admin-g" || u.tipo_admin === "admin-s";
+
+  if (btnChat) btnChat.hidden = !esAdmin;
+  if (btnVideo) btnVideo.hidden = !esAdmin;
+  if (btnLogs) btnLogs.hidden = u.tipo_admin !== "admin-g";
+
   await cargarSedes();
   enviarHeartbeat();
   setInterval(enviarHeartbeat, 30000);

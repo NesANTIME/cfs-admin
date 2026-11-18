@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from db.template.empleado import Empleado, Tecnico, UsuarioSede
 from config.utils.request import UsuarioCreate, UsuarioResponse, UsuarioEstadoUpdate
 from core.deps import getCurrentUser, requireAdmin, obtenerTipoAdmin
+from core.audit import registrar_log
 from db.template.refresh_token import RefreshToken
 from sqlalchemy import delete, func
 
@@ -161,6 +162,16 @@ def _crearUsuarioEnSede(
         ),
     ])
 
+    accion_log = "ADMIN_S_REGISTRADO" if data.es_admin_s else "USUARIO_REGISTRADO"
+    registrar_log(
+        db,
+        accion=accion_log,
+        entidad="empleado",
+        id_entidad=nuevo_emp.id_empleado,
+        detalle=f"{accion_log}: '{nuevo_emp.usuario}' (Nombre: {nuevo_emp.nombre}) registrado en sede #{id_sede} por {user.usuario}.",
+        actor=user,
+    )
+
     db.commit()
     db.refresh(nuevo_emp)
 
@@ -248,6 +259,20 @@ def _actualizarEstadoUsuarioSede(
             delete(RefreshToken).where(RefreshToken.id_empleado == objetivo.id_empleado)
         )
 
+    accion_estado = "ADMIN_S_HABILITADO" if (objetivo.tipo == "tecnico" and data.activo) else (
+        "ADMIN_S_DESHABILITADO" if (objetivo.tipo == "tecnico" and not data.activo) else (
+            "USUARIO_HABILITADO" if data.activo else "USUARIO_DESHABILITADO"
+        )
+    )
+    registrar_log(
+        db,
+        accion=accion_estado,
+        entidad="empleado",
+        id_entidad=objetivo.id_empleado,
+        detalle=f"{accion_estado}: acceso de '{objetivo.usuario}' ({objetivo.tipo}) {'habilitado' if data.activo else 'deshabilitado'} en sede #{id_sede}.",
+        actor=user,
+    )
+
     db.commit()
     db.refresh(objetivo)
 
@@ -299,5 +324,15 @@ def _eliminarUsuarioDeSede(
     db.execute(
         delete(RefreshToken).where(RefreshToken.id_empleado == objetivo.id_empleado)
     )
+
+    registrar_log(
+        db,
+        accion="USUARIO_DESACTIVADO",
+        entidad="empleado",
+        id_entidad=objetivo.id_empleado,
+        detalle=f"Usuario '{objetivo.usuario}' desactivado en sede #{id_sede} por {user.usuario}.",
+        actor=user,
+    )
+
     db.commit()
     return {"detalle": f"El usuario {objetivo.usuario} ha sido desactivado."}

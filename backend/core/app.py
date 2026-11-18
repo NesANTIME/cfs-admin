@@ -32,6 +32,8 @@ from api.heartbeat import router as router_heartbeat
 from api.contactos import router as router_contactos
 from api.chat import router as router_chat
 from api.videoconferencia import router as router_videoconferencia
+from api.dispositivos import router as router_dispositivos
+from api.logs import router as router_logs
 # ---
 
 app.include_router(router_login)
@@ -43,4 +45,6 @@ app.include_router(router_heartbeat)
 app.include_router(router_contactos)
 app.include_router(router_chat)
 app.include_router(router_videoconferencia)
+app.include_router(router_dispositivos)
+app.include_router(router_logs)
 

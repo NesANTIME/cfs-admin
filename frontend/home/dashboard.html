@@ -19,6 +19,9 @@
     <span class="user-tag" id="user-role"></span>
   </div>
   <div class="actions">
+    <a class="ghost" id="btn-ir-chat" href="chat.html" title="Chat Intra-Sede" hidden>💬 Chat</a>
+    <a class="ghost" id="btn-ir-video" href="videollamadas.html" title="Videoconferencias" hidden>📹 Video</a>
+    <a class="ghost" id="btn-ir-logs" href="logs.html" title="Auditoría y Logs" hidden>📋 Logs</a>
     <button class="ghost" id="btn-cambiar-pass" type="button" aria-label="Cambiar contraseña">🔑 Contraseña</button>
     <button class="ghost" id="theme" type="button" aria-label="Cambiar tema">Tema</button>
     <button class="ghost" id="logout" type="button">Salir</button>
@@ -38,6 +41,7 @@
       <h1 id="sede-nombre-titulo">Cargando sede…</h1>
       <p class="lead" id="sede-ubicacion-lead">📍 Ubicación</p>
       <p class="sede-desc-text" id="sede-descripcion-texto">Cargando descripción…</p>
+      <div id="sede-admins-container" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;"></div>
     </div>
     <div class="sede-banner-actions">
       <button class="btn" id="refresh-sede" type="button">Actualizar sede</button>
@@ -50,6 +54,20 @@
     <article class="kpi ok-k"><span>En línea</span><b id="k-disp-up">0</b></article>
     <article class="kpi warn-k"><span>Alertas</span><b id="k-disp-warn">0</b></article>
     <article class="kpi down-k"><span>Fuera de línea</span><b id="k-disp-down">0</b></article>
+  </section>
+
+  <!-- Sección: Comunicaciones de Sede (Acceso para Admin-S y Admin-G) -->
+  <section class="card panel" id="sec-comunicaciones-sede" style="background:linear-gradient(135deg, rgba(59,130,246,0.06), rgba(16,185,129,0.06)); border:1px solid rgba(59,130,246,0.2);">
+    <div class="panel-head-row" style="margin-bottom:0.5rem;">
+      <div>
+        <h2 class="panel-title" style="font-size:1.1rem;">📡 Comunicaciones en Tiempo Real</h2>
+        <p class="panel-sub">Acceso rápido a canales de mensajería y salas de videoconferencia para esta sede</p>
+      </div>
+      <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+        <a class="btn" href="chat.html" style="font-size:0.85rem; padding:6px 14px; text-decoration:none;">💬 Abrir Chat Intra-Sede</a>
+        <a class="btn" href="videollamadas.html" style="font-size:0.85rem; padding:6px 14px; text-decoration:none; background:var(--accent,#3b82f6);">📹 Videoconferencias</a>
+      </div>
+    </div>
   </section>
 
   <!-- Sección 0: Usuarios/Clientes de la Sede con control de servicios -->
@@ -94,23 +112,28 @@
     <div class="panel-head-row">
       <div>
         <h2 class="panel-title">📡 Dispositivos de Red en esta Sede</h2>
-        <p class="panel-sub">Equipos de comunicación, enrutamiento y seguridad instalados en la sede</p>
+        <p class="panel-sub">Equipos de comunicación, enrutamiento y seguridad vinculados por UID y monitoreados en tiempo real</p>
+      </div>
+      <div>
+        <button class="btn" id="btn-vincular-dispositivo" type="button">🔗 Vincular Dispositivo (UID)</button>
       </div>
     </div>
     <div class="tools">
-      <input id="q-disp" type="search" placeholder="Buscar dispositivo por nombre, IP o MAC…" aria-label="Buscar dispositivo">
+      <input id="q-disp" type="search" placeholder="Buscar dispositivo por nombre, IP, MAC o UID…" aria-label="Buscar dispositivo">
       <span class="pill up" id="badge-disp-count">0 dispositivos</span>
     </div>
     <div class="scroll">
       <table>
         <thead>
           <tr>
-            <th style="width: 70px;">ID</th>
+            <th style="width: 60px;">ID</th>
             <th>Nombre del Dispositivo</th>
-            <th style="width: 140px;">Tipo</th>
-            <th style="width: 160px;">Dirección IP</th>
-            <th style="width: 180px;">Dirección MAC</th>
-            <th style="width: 140px;">Estado</th>
+            <th style="width: 130px;">Tipo</th>
+            <th style="width: 150px;">Dirección IP</th>
+            <th style="width: 160px;">Dirección MAC</th>
+            <th style="width: 120px;">Estado (Ping)</th>
+            <th style="width: 110px;">Vinculado</th>
+            <th style="width: 170px; text-align:right">Acciones</th>
           </tr>
         </thead>
         <tbody id="rows-dispositivos"></tbody>
@@ -122,6 +145,97 @@
 
 
 </main>
+
+<!-- Modal: Paso 1 - Ingresar UID del Dispositivo -->
+<div class="modal-backdrop" id="modal-vincular-uid" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-uid">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="titulo-modal-uid">🔗 Paso 1: Vincular Dispositivo por UID</h2>
+      <button class="modal-close" id="btn-cerrar-uid" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <p class="modal-sub">Ingresa el UID generado por el programa cliente instalado en el dispositivo. El sistema verificará automáticamente la conectividad en la red (mediante ping a la IP ofuscada).</p>
+
+    <form id="form-vincular-uid" novalidate>
+      <div class="form-group">
+        <label for="input-disp-uid">UID del Dispositivo <span class="req">*</span></label>
+        <input type="text" id="input-disp-uid" required placeholder="Ej: UID-7f8a9b-MTkyLjE2OC4xLjUw-c1d2e3" autocomplete="off" maxlength="128">
+      </div>
+
+      <div class="form-msg" id="msg-vincular-uid" role="alert" hidden></div>
+
+      <div class="modal-actions">
+        <button class="ghost" id="btn-cancelar-uid" type="button">Cancelar</button>
+        <button class="btn" id="btn-submit-uid" type="submit">🔍 Verificar en Red (Ping) →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Paso 2 - Confirmar Contraseña y Vincular -->
+<div class="modal-backdrop" id="modal-vincular-pass" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-dpass">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="titulo-modal-dpass">🔑 Paso 2: Autenticar y Vincular a Sede</h2>
+      <button class="modal-close" id="btn-cerrar-dpass" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <div id="info-disp-detectado" style="background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:0.88rem;"></div>
+    <p class="modal-sub">Ingresa la contraseña establecida en el programa cliente del dispositivo para confirmar el enlace exclusivo con esta sede.</p>
+
+    <form id="form-vincular-pass" novalidate>
+      <div class="form-group">
+        <label for="input-disp-pass">Contraseña del Dispositivo <span class="req">*</span></label>
+        <input type="password" id="input-disp-pass" required placeholder="Contraseña configurada en el cliente" autocomplete="off">
+      </div>
+
+      <div class="form-msg" id="msg-vincular-pass" role="alert" hidden></div>
+
+      <div class="modal-actions">
+        <button class="ghost" id="btn-cancelar-dpass" type="button">Cancelar</button>
+        <button class="btn" id="btn-submit-dpass" type="submit" style="background:var(--ok,#10b981);">✅ Confirmar y Vincular</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Ver más información y Monitoreo en Tiempo Real -->
+<div class="modal-backdrop" id="modal-detalle-dispositivo" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-ddet">
+  <div class="modal-card" style="max-width:540px;">
+    <div class="modal-header">
+      <h2 id="titulo-modal-ddet">📡 Información y Monitoreo del Dispositivo</h2>
+      <button class="modal-close" id="btn-cerrar-ddet" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <div id="contenido-detalle-disp">Cargando telemetría…</div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="ghost" id="btn-cerrar-detalle-disp" type="button">Cerrar</button>
+      <button class="btn" id="btn-ping-monitoreo" type="button">🔄 Refrescar Ping</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Desvincular y Eliminar Dispositivo -->
+<div class="modal-backdrop" id="modal-desvincular-disp" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-desv">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 id="titulo-modal-desv" style="color:var(--danger,#ef4444);">⚠️ Desvincular y Eliminar Dispositivo</h2>
+      <button class="modal-close" id="btn-cerrar-desv" type="button" aria-label="Cerrar modal">&times;</button>
+    </div>
+    <p class="modal-sub">Para desvincular y eliminar este dispositivo de la sede se requiere ingresar la contraseña de seguridad del dispositivo. Al hacerlo, el cliente será notificado y quedará habilitado para enlazarse a otra sede.</p>
+
+    <form id="form-desvincular-disp" novalidate>
+      <div class="form-group">
+        <label for="input-desv-pass">Contraseña del Dispositivo <span class="req">*</span></label>
+        <input type="password" id="input-desv-pass" required placeholder="Ingresa la contraseña del dispositivo" autocomplete="off">
+      </div>
+
+      <div class="form-msg" id="msg-desvincular-disp" role="alert" hidden></div>
+
+      <div class="modal-actions">
+        <button class="ghost" id="btn-cancelar-desv" type="button">Cancelar</button>
+        <button class="btn" id="btn-submit-desv" type="submit" style="background:var(--danger,#ef4444);">🗑️ Desvincular y Eliminar</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <!-- Modal: Crear Nuevo Usuario en la Sede -->
 <div class="modal-backdrop" id="modal-crear-usuario" hidden role="dialog" aria-modal="true" aria-labelledby="titulo-modal-usuario">

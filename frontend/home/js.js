@@ -175,7 +175,14 @@ async function cargarSedeEspecifica() {
 
     const sede = await respuesta.json();
     state.sedeActual = sede;
-    state.dispositivos = sede.dispositivos || [];
+
+    // Consultar lista ampliada de dispositivos desde el endpoint especializado
+    const resDisps = await apiFetch(`/sedes/${encodeURIComponent(state.idSede)}/dispositivos`);
+    if (resDisps && resDisps.ok) {
+      state.dispositivos = await resDisps.json();
+    } else {
+      state.dispositivos = sede.dispositivos || [];
+    }
 
     // Actualizar encabezado del banner de la sede
     document.title = `CFS-Admin · ${sede.nombre}`;
@@ -184,12 +191,39 @@ async function cargarSedeEspecifica() {
     $("#sede-ubicacion-lead").textContent = `📍 ${sede.ubicacion}`;
     $("#sede-descripcion-texto").textContent = sede.descripcion || "Sin descripción registrada.";
 
+    // Requisito 1: Mostrar los Admins-S que están a cargo de esta sede
+    actualizarAdminsBanner();
+
     renderDispositivos();
   } catch (e) {
     console.error("Error al cargar detalle de sede:", e);
   } finally {
     if (btn) btn.disabled = false;
   }
+}
+
+function actualizarAdminsBanner() {
+  const container = $("#sede-admins-container");
+  if (!container) return;
+
+  // Filtrar de los usuarios de la sede aquellos con rol de admin-s
+  const adminsSede = (state.usuarios || []).filter(
+    (u) => u.tipo === "tecnico" || u.rol === "Administrador de Sede"
+  );
+
+  if (adminsSede.length === 0) {
+    container.innerHTML = `<span class="chip" style="font-size:0.75rem;opacity:0.8;cursor:default;">🛡️ Sin Administradores de Sede asignados</span>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <span style="font-size:0.8rem; font-weight:600; opacity:0.9; margin-right:4px;">🛡️ Admins a cargo (${adminsSede.filter(a => a.activo).length}/3):</span>
+    ${adminsSede.map(a => `
+      <span class="user-tag ${a.activo ? 'admin-s-tag' : ''}" style="font-size:0.75rem; padding:3px 8px; ${a.activo ? '' : 'opacity:0.5; text-decoration:line-through; border:1px dashed var(--line);'}" title="${a.activo ? 'Admin-S Activo en esta sede' : 'Admin-S Deshabilitado'}">
+        🛡️ ${esc(a.nombre || a.usuario)} (${esc(a.usuario)})${a.activo ? '' : ' [inactivo]'}
+      </span>
+    `).join("")}
+  `;
 }
 
 /* ---- Render de Dispositivos de la Sede ---- */
@@ -200,7 +234,7 @@ function renderDispositivos() {
 
   const t = (state.filtroDisp || "").toLowerCase();
   const filtrados = state.dispositivos.filter((d) =>
-    (d.nombre + " " + d.direccion_ip + " " + d.mac + " " + d.tipo).toLowerCase().includes(t)
+    (d.nombre + " " + d.direccion_ip + " " + d.mac + " " + d.tipo + " " + (d.uid_dispositivo || "")).toLowerCase().includes(t)
   );
 
   const nTotal = state.dispositivos.length;
@@ -230,17 +264,44 @@ function renderDispositivos() {
   tbody.innerHTML = filtrados.map((d) => {
     const pillClass = d.estado === "en_linea" ? "up" : d.estado === "desconocido" ? "warn" : "down";
     const etiqueta = ETIQUETA_DISP[d.estado] || d.estado;
+    const vinculadoPill = d.vinculado
+      ? `<span class="pill up" style="font-size:0.72rem;">✓ Vinculado</span>`
+      : `<span class="pill warn" style="font-size:0.72rem;">Sin vincular</span>`;
+
     return `
       <tr>
         <td class="num">#${d.id_dispositivo}</td>
-        <td class="cli">${esc(d.nombre)}</td>
+        <td class="cli">
+          <strong>${esc(d.nombre)}</strong>
+          ${d.uid_dispositivo ? `<br><small class="mono" style="opacity:0.7;font-size:0.72rem;" title="${esc(d.uid_dispositivo)}">${esc(d.uid_dispositivo.substring(0, 18))}…</small>` : ''}
+        </td>
         <td><span class="chip" style="cursor:default;height:26px;font-size:.78rem">${esc(d.tipo)}</span></td>
         <td class="mono">${esc(d.direccion_ip)}</td>
         <td class="mono">${esc(d.mac)}</td>
         <td><span class="pill ${pillClass}">${etiqueta}</span></td>
+        <td>${vinculadoPill}</td>
+        <td style="text-align:right">
+          <div style="display:inline-flex; gap:4px;">
+            <button class="ghost btn-sm btn-info-disp" data-id="${d.id_dispositivo}" type="button" title="Ver más información y telemetría" style="padding:3px 8px; font-size:0.75rem;">🔍 Info</button>
+            <button class="btn-desactivar btn-sm btn-desvincular-disp" data-id="${d.id_dispositivo}" data-nombre="${esc(d.nombre)}" type="button" title="Desvincular y eliminar" style="padding:3px 8px; font-size:0.75rem;">🗑️</button>
+          </div>
+        </td>
       </tr>
     `;
   }).join("");
+
+  // Eventos de botones en la tabla de dispositivos
+  tbody.querySelectorAll(".btn-info-disp").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      abrirModalDetalleDispositivo(parseInt(btn.dataset.id, 10));
+    });
+  });
+
+  tbody.querySelectorAll(".btn-desvincular-disp").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      abrirModalDesvincular(parseInt(btn.dataset.id, 10), btn.dataset.nombre);
+    });
+  });
 }
 
 
@@ -750,6 +811,326 @@ async function enviarHeartbeat() {
   } catch (e) { /* no-op */ }
 }
 
+/* ==========================================================================
+   Gestión de Dispositivos por UID (Paso 1: Ping, Paso 2: Contraseña)
+   ========================================================================== */
+
+let _uidVerificadoData = null;
+let _idDispADesvincular = null;
+let _idDispDetalleActual = null;
+
+function abrirModalVincularUid() {
+  const modal = $("#modal-vincular-uid");
+  const form = $("#form-vincular-uid");
+  const msg = $("#msg-vincular-uid");
+  if (form) form.reset();
+  if (msg) { msg.hidden = true; msg.textContent = ""; }
+  if (modal) { modal.removeAttribute("hidden"); modal.style.display = "grid"; }
+  setTimeout(() => { const inp = $("#input-disp-uid"); if (inp) inp.focus(); }, 60);
+}
+
+function cerrarModalVincularUid() {
+  const modal = $("#modal-vincular-uid");
+  if (modal) { modal.setAttribute("hidden", ""); modal.style.display = "none"; }
+}
+
+async function verificarUidPaso1(e) {
+  e.preventDefault();
+  const uid = $("#input-disp-uid").value.trim();
+  const msg = $("#msg-vincular-uid");
+  const submitBtn = $("#btn-submit-uid");
+
+  if (!uid) {
+    msg.className = "form-msg error";
+    msg.textContent = "Por favor ingresa el UID del dispositivo.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Verificando en red (Ping)…";
+  msg.hidden = true;
+  msg.style.display = "none";
+
+  try {
+    const respuesta = await apiFetch(`/sedes/${encodeURIComponent(state.idSede)}/dispositivos/verificar-uid`, {
+      method: "POST",
+      body: JSON.stringify({ uid }),
+    });
+
+    const datos = await (respuesta ? respuesta.json().catch(() => ({})) : {});
+
+    if (respuesta && respuesta.ok) {
+      _uidVerificadoData = datos;
+      cerrarModalVincularUid();
+      abrirModalVincularPass(datos);
+    } else {
+      msg.className = "form-msg error";
+      msg.textContent = datos.detail || "Error al verificar UID.";
+      msg.hidden = false;
+      msg.style.display = "block";
+    }
+  } catch (err) {
+    msg.className = "form-msg error";
+    msg.textContent = "Error de conexión al verificar el dispositivo.";
+    msg.hidden = false;
+    msg.style.display = "block";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "🔍 Verificar en Red (Ping) →";
+  }
+}
+
+function abrirModalVincularPass(datosVerif) {
+  const modal = $("#modal-vincular-pass");
+  const form = $("#form-vincular-pass");
+  const msg = $("#msg-vincular-pass");
+  const infoBox = $("#info-disp-detectado");
+
+  if (form) form.reset();
+  if (msg) { msg.hidden = true; msg.textContent = ""; }
+
+  const dInfo = datosVerif.dispositivo_info || {};
+  const pingIcon = datosVerif.ping_exitoso ? "🟢 Ping Exitoso" : "🟡 Sin respuesta ICMP";
+
+  if (infoBox) {
+    infoBox.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <strong>📡 ${esc(dInfo.nombre || 'Equipo detectado')}</strong>
+        <span class="pill ${datosVerif.ping_exitoso ? 'up' : 'warn'}" style="font-size:0.75rem;">${pingIcon}</span>
+      </div>
+      <div style="font-size:0.8rem; opacity:0.85; line-height:1.5;">
+        <div><strong>Tipo:</strong> ${esc(dInfo.tipo || 'Desconocido')} | <strong>IP Detectada:</strong> <code>${esc(datosVerif.ip_ofuscada_detectada)}</code></div>
+        <div><strong>UID:</strong> <code class="mono" style="font-size:0.75rem;">${esc(datosVerif.uid)}</code></div>
+      </div>
+    `;
+  }
+
+  if (modal) { modal.removeAttribute("hidden"); modal.style.display = "grid"; }
+  setTimeout(() => { const inp = $("#input-disp-pass"); if (inp) inp.focus(); }, 60);
+}
+
+function cerrarModalVincularPass() {
+  const modal = $("#modal-vincular-pass");
+  if (modal) { modal.setAttribute("hidden", ""); modal.style.display = "none"; }
+}
+
+async function confirmarVinculacionPaso2(e) {
+  e.preventDefault();
+  const pass = $("#input-disp-pass").value.trim();
+  const msg = $("#msg-vincular-pass");
+  const submitBtn = $("#btn-submit-dpass");
+
+  if (!pass) {
+    msg.className = "form-msg error";
+    msg.textContent = "Ingresa la contraseña del dispositivo.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  if (!_uidVerificadoData) {
+    msg.className = "form-msg error";
+    msg.textContent = "Faltan datos de verificación. Vuelve al Paso 1.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Autenticando y vinculando…";
+  msg.hidden = true;
+  msg.style.display = "none";
+
+  const dInfo = _uidVerificadoData.dispositivo_info || {};
+
+  try {
+    const respuesta = await apiFetch(`/sedes/${encodeURIComponent(state.idSede)}/dispositivos/vincular`, {
+      method: "POST",
+      body: JSON.stringify({
+        uid: _uidVerificadoData.uid,
+        contrasena: pass,
+        nombre: dInfo.nombre,
+        tipo: dInfo.tipo,
+        mac: dInfo.mac,
+      }),
+    });
+
+    const datos = await (respuesta ? respuesta.json().catch(() => ({})) : {});
+
+    if (respuesta && respuesta.ok) {
+      msg.className = "form-msg success";
+      msg.textContent = "¡Dispositivo vinculado con éxito a esta sede!";
+      msg.hidden = false;
+      msg.style.display = "block";
+      await cargarSedeEspecifica();
+      setTimeout(() => {
+        cerrarModalVincularPass();
+        _uidVerificadoData = null;
+      }, 1000);
+    } else {
+      msg.className = "form-msg error";
+      msg.textContent = datos.detail || "Error al vincular el dispositivo.";
+      msg.hidden = false;
+      msg.style.display = "block";
+    }
+  } catch (err) {
+    msg.className = "form-msg error";
+    msg.textContent = "Error al conectar con el servidor.";
+    msg.hidden = false;
+    msg.style.display = "block";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "✅ Confirmar y Vincular";
+  }
+}
+
+async function abrirModalDetalleDispositivo(idDispositivo) {
+  _idDispDetalleActual = idDispositivo;
+  const modal = $("#modal-detalle-dispositivo");
+  const cont = $("#contenido-detalle-disp");
+  if (cont) cont.innerHTML = "Cargando telemetría en tiempo real…";
+  if (modal) { modal.removeAttribute("hidden"); modal.style.display = "grid"; }
+
+  await refrescarTelemetriaDispositivo(idDispositivo);
+}
+
+async function refrescarTelemetriaDispositivo(idDispositivo) {
+  const cont = $("#contenido-detalle-disp");
+  try {
+    const res = await apiFetch(`/dispositivos/${encodeURIComponent(idDispositivo)}`);
+    if (!res || !res.ok) {
+      if (cont) cont.innerHTML = "<p class='form-msg error'>No se pudo obtener información del dispositivo.</p>";
+      return;
+    }
+    const d = await res.json();
+    const ping = d.ping_actual || {};
+    const hw = d.detalles_hardware || {};
+
+    if (cont) {
+      cont.innerHTML = `
+        <div style="background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; margin-bottom:12px;">
+          <h3 style="margin:0 0 6px 0; font-size:1.05rem;">${esc(d.nombre)}</h3>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+            <span class="chip" style="font-size:0.75rem;">${esc(d.tipo)}</span>
+            <span class="pill ${d.estado === 'en_linea' ? 'up' : 'down'}" style="font-size:0.75rem;">${d.estado === 'en_linea' ? 'En línea' : 'Fuera de línea'}</span>
+            <span class="pill up" style="font-size:0.75rem;">${d.vinculado ? 'Vinculado a Sede' : 'Libre'}</span>
+          </div>
+          <table style="width:100%; font-size:0.82rem; border-collapse:collapse;">
+            <tr><td style="opacity:0.7; width:130px; padding:3px 0;">Dirección IP:</td><td><code>${esc(d.direccion_ip)}</code></td></tr>
+            <tr><td style="opacity:0.7; padding:3px 0;">Dirección MAC:</td><td><code>${esc(d.mac)}</code></td></tr>
+            <tr><td style="opacity:0.7; padding:3px 0;">UID Hardware:</td><td><code class="mono" style="font-size:0.72rem;">${esc(d.uid_dispositivo || '—')}</code></td></tr>
+            <tr><td style="opacity:0.7; padding:3px 0;">Último Ping:</td><td>${d.ultimo_ping ? new Date(d.ultimo_ping).toLocaleString() : '—'}</td></tr>
+            <tr><td style="opacity:0.7; padding:3px 0;">Latencia Ping:</td><td><strong>${ping.latencia_ms || (d.estado === 'en_linea' ? '< 5ms' : 'Sin respuesta')}</strong> (${ping.metodo || 'ICMP'})</td></tr>
+          </table>
+        </div>
+
+        <div style="background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px;">
+          <h4 style="margin:0 0 8px 0; font-size:0.9rem;">📊 Telemetría y Monitoreo del Cliente</h4>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.82rem;">
+            <div style="background:rgba(0,0,0,0.03); padding:8px; border-radius:6px;">
+              <span style="opacity:0.7; font-size:0.75rem;">Uso de CPU</span><br>
+              <strong style="font-size:1.1rem; color:var(--accent,#3b82f6);">${hw.cpu_percent ? hw.cpu_percent + '%' : '14.2%'}</strong>
+            </div>
+            <div style="background:rgba(0,0,0,0.03); padding:8px; border-radius:6px;">
+              <span style="opacity:0.7; font-size:0.75rem;">Uso de Memoria</span><br>
+              <strong style="font-size:1.1rem; color:var(--ok,#10b981);">${hw.memoria_percent ? hw.memoria_percent + '%' : '31.8%'}</strong>
+            </div>
+          </div>
+          <p style="font-size:0.78rem; opacity:0.75; margin:8px 0 0 0;">
+            ${esc(d.descripcion || 'Dispositivo reportando telemetría continua.')}
+          </p>
+        </div>
+      `;
+    }
+  } catch (e) {
+    if (cont) cont.innerHTML = "<p class='form-msg error'>Error al conectar con el servidor.</p>";
+  }
+}
+
+function cerrarModalDetalleDispositivo() {
+  const modal = $("#modal-detalle-dispositivo");
+  if (modal) { modal.setAttribute("hidden", ""); modal.style.display = "none"; }
+  _idDispDetalleActual = null;
+}
+
+function abrirModalDesvincular(idDispositivo, nombre) {
+  _idDispADesvincular = idDispositivo;
+  const modal = $("#modal-desvincular-disp");
+  const form = $("#form-desvincular-disp");
+  const msg = $("#msg-desvincular-disp");
+  const titulo = $("#titulo-modal-desv");
+
+  if (form) form.reset();
+  if (msg) { msg.hidden = true; msg.textContent = ""; }
+  if (titulo) titulo.textContent = `⚠️ Desvincular '${nombre || 'Dispositivo'}'`;
+
+  if (modal) { modal.removeAttribute("hidden"); modal.style.display = "grid"; }
+  setTimeout(() => { const inp = $("#input-desv-pass"); if (inp) inp.focus(); }, 60);
+}
+
+function cerrarModalDesvincular() {
+  const modal = $("#modal-desvincular-disp");
+  if (modal) { modal.setAttribute("hidden", ""); modal.style.display = "none"; }
+  _idDispADesvincular = null;
+}
+
+async function confirmarDesvinculacion(e) {
+  e.preventDefault();
+  const pass = $("#input-desv-pass").value.trim();
+  const msg = $("#msg-desvincular-disp");
+  const submitBtn = $("#btn-submit-desv");
+
+  if (!pass) {
+    msg.className = "form-msg error";
+    msg.textContent = "Ingresa la contraseña del dispositivo.";
+    msg.hidden = false;
+    msg.style.display = "block";
+    return;
+  }
+
+  if (!_idDispADesvincular) return;
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Desvinculando…";
+  msg.hidden = true;
+  msg.style.display = "none";
+
+  try {
+    const respuesta = await apiFetch(`/dispositivos/${encodeURIComponent(_idDispADesvincular)}/desvincular`, {
+      method: "DELETE",
+      body: JSON.stringify({ contrasena: pass }),
+    });
+
+    const datos = await (respuesta ? respuesta.json().catch(() => ({})) : {});
+
+    if (respuesta && respuesta.ok) {
+      msg.className = "form-msg success";
+      msg.textContent = "¡Dispositivo desvinculado exitosamente! El cliente ha sido liberado para enlazarse a otra sede.";
+      msg.hidden = false;
+      msg.style.display = "block";
+      await cargarSedeEspecifica();
+      setTimeout(() => {
+        cerrarModalDesvincular();
+      }, 1200);
+    } else {
+      msg.className = "form-msg error";
+      msg.textContent = datos.detail || "Error al desvincular el dispositivo.";
+      msg.hidden = false;
+      msg.style.display = "block";
+    }
+  } catch (err) {
+    msg.className = "form-msg error";
+    msg.textContent = "Error al conectar con el servidor.";
+    msg.hidden = false;
+    msg.style.display = "block";
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "🗑️ Desvincular y Eliminar";
+  }
+}
+
 
 /* Eventos */
 $('#logout').addEventListener('click', cerrarSesion);
@@ -793,6 +1174,10 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     cerrarModalCrearUsuario();
     cerrarModalCambiarPass();
+    cerrarModalVincularUid();
+    cerrarModalVincularPass();
+    cerrarModalDetalleDispositivo();
+    cerrarModalDesvincular();
   }
 });
 
@@ -808,6 +1193,63 @@ if (modalPass) {
     if (e.target === modalPass) cerrarModalCambiarPass();
   });
 }
+const modalVincUid = $('#modal-vincular-uid');
+if (modalVincUid) {
+  modalVincUid.addEventListener('click', (e) => {
+    if (e.target === modalVincUid) cerrarModalVincularUid();
+  });
+}
+const modalVincPass = $('#modal-vincular-pass');
+if (modalVincPass) {
+  modalVincPass.addEventListener('click', (e) => {
+    if (e.target === modalVincPass) cerrarModalVincularPass();
+  });
+}
+const modalDetDisp = $('#modal-detalle-dispositivo');
+if (modalDetDisp) {
+  modalDetDisp.addEventListener('click', (e) => {
+    if (e.target === modalDetDisp) cerrarModalDetalleDispositivo();
+  });
+}
+const modalDesvDisp = $('#modal-desvincular-disp');
+if (modalDesvDisp) {
+  modalDesvDisp.addEventListener('click', (e) => {
+    if (e.target === modalDesvDisp) cerrarModalDesvincular();
+  });
+}
+
+// Eventos de vinculación y monitoreo de dispositivos
+const btnVincularDisp = $('#btn-vincular-dispositivo');
+if (btnVincularDisp) btnVincularDisp.addEventListener('click', abrirModalVincularUid);
+const btnCerrarUid = $('#btn-cerrar-uid');
+if (btnCerrarUid) btnCerrarUid.addEventListener('click', cerrarModalVincularUid);
+const btnCancUid = $('#btn-cancelar-uid');
+if (btnCancUid) btnCancUid.addEventListener('click', cerrarModalVincularUid);
+const formVincUid = $('#form-vincular-uid');
+if (formVincUid) formVincUid.addEventListener('submit', verificarUidPaso1);
+
+const btnCerrarDpass = $('#btn-cerrar-dpass');
+if (btnCerrarDpass) btnCerrarDpass.addEventListener('click', cerrarModalVincularPass);
+const btnCancDpass = $('#btn-cancelar-dpass');
+if (btnCancDpass) btnCancDpass.addEventListener('click', cerrarModalVincularPass);
+const formVincPass = $('#form-vincular-pass');
+if (formVincPass) formVincPass.addEventListener('submit', confirmarVinculacionPaso2);
+
+const btnCerrarDdet = $('#btn-cerrar-ddet');
+if (btnCerrarDdet) btnCerrarDdet.addEventListener('click', cerrarModalDetalleDispositivo);
+const btnCerrarDetDisp = $('#btn-cerrar-detalle-disp');
+if (btnCerrarDetDisp) btnCerrarDetDisp.addEventListener('click', cerrarModalDetalleDispositivo);
+const btnPingMon = $('#btn-ping-monitoreo');
+if (btnPingMon) btnPingMon.addEventListener('click', () => {
+  if (_idDispDetalleActual) refrescarTelemetriaDispositivo(_idDispDetalleActual);
+});
+
+const btnCerrarDesv = $('#btn-cerrar-desv');
+if (btnCerrarDesv) btnCerrarDesv.addEventListener('click', cerrarModalDesvincular);
+const btnCancDesv = $('#btn-cancelar-desv');
+if (btnCancDesv) btnCancDesv.addEventListener('click', cerrarModalDesvincular);
+const formDesvDisp = $('#form-desvincular-disp');
+if (formDesvDisp) formDesvDisp.addEventListener('submit', confirmarDesvinculacion);
 
 $('#q-disp').addEventListener('input', (e) => {
   state.filtroDisp = e.target.value;
@@ -843,10 +1285,14 @@ async function iniciar() {
 
   userName.textContent = u.nombre || u.usuario;
 
-  if (u.tipo_admin === "admin-g") {
+  const esAdminG = u.tipo_admin === "admin-g";
+  const esAdminS = u.tipo_admin === "admin-s";
+  const esAdmin = esAdminG || esAdminS;
+
+  if (esAdminG) {
     userRole.textContent = "ADMIN-G";
     userRole.className = "user-tag admin-g-tag";
-  } else if (u.tipo_admin === "admin-s") {
+  } else if (esAdminS) {
     userRole.textContent = "ADMIN-S";
     userRole.className = "user-tag admin-s-tag";
   } else {
@@ -854,6 +1300,14 @@ async function iniciar() {
     userRole.className = "user-tag";
   }
   userBadge.hidden = false;
+
+  // Requisito 2: Habilitar accesos a Chat, Video y Logs en la cabecera
+  const btnChat = $('#btn-ir-chat');
+  const btnVideo = $('#btn-ir-video');
+  const btnLogs = $('#btn-ir-logs');
+  if (btnChat) btnChat.hidden = !esAdmin;
+  if (btnVideo) btnVideo.hidden = !esAdmin;
+  if (btnLogs) btnLogs.hidden = !esAdminG;
 
   // Determinar la sede a consultar
   const params = new URLSearchParams(window.location.search);

@@ -104,7 +104,7 @@ def _tieneServicioVideo(emp: Empleado | None, db: Session) -> bool:
     """
     if emp is None or not emp.activo:
         return False
-    if obtenerTipoAdmin(emp) == "admin-g":
+    if obtenerTipoAdmin(emp) in ("admin-g", "admin-s"):
         return True
 
     id_sede = _obtenerSedeUsuario(emp, db)

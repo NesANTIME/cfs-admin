@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CFS-Admin · Auditoría y Registros del Sistema</title>
+<link rel="stylesheet" href="dashboard.css">
+<style>
+  .badge-accion {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    font-family: monospace;
+    letter-spacing: -0.3px;
+  }
+  .badge-permiso { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+  .badge-usuario { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+  .badge-desactivar { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+  .badge-disp { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+  .badge-sede { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); }
+  .badge-otro { background: rgba(100, 116, 139, 0.15); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.3); }
+
+  .filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .filter-group label {
+    display: block;
+    font-size: 0.76rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    opacity: 0.85;
+  }
+  .filter-group input, .filter-group select {
+    width: 100%;
+    height: 38px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--ink);
+    padding: 0 10px;
+    font: inherit;
+    font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><i class="s s1"></i><i class="s s2"></i><i class="s s3"></i></div>
+
+<header class="top">
+  <div class="top-nav-left">
+    <a class="ghost btn-back" id="btn-volver" href="index.html" aria-label="Volver al panel principal">← Volver al Panel</a>
+    <div class="brand"><span class="mark">CFS</span><b>Auditoría y Logs</b></div>
+  </div>
+  <div class="user-info" id="user-badge" hidden>
+    <span class="user-name" id="user-name"></span>
+    <span class="user-tag admin-g-tag" id="user-role">ADMIN-G</span>
+  </div>
+  <div class="actions">
+    <button class="ghost" id="theme" type="button" aria-label="Cambiar tema">Tema</button>
+    <button class="ghost" id="logout" type="button">Salir</button>
+  </div>
+</header>
+
+<main class="wrap" id="panel" hidden>
+  <div class="head">
+    <div>
+      <h1>📋 Registro Oficial de Auditoría</h1>
+      <p class="lead">Trazabilidad completa de cambios de permisos, creación y modificación de usuarios, sedes y dispositivos de red</p>
+    </div>
+    <div class="head-actions" style="display:flex; gap:8px;">
+      <button class="btn" id="btn-exportar-pdf" type="button" style="background:var(--accent,#3b82f6);">📄 Exportar a PDF</button>
+      <button class="ghost" id="btn-exportar-csv" type="button">📊 Exportar CSV</button>
+      <button class="ghost" id="btn-refrescar" type="button">🔄 Refrescar</button>
+    </div>
+  </div>
+
+  <!-- Tarjeta de Filtros Avanzados -->
+  <section class="card panel" style="padding:16px; margin-bottom:18px;">
+    <div class="panel-head-row" style="margin-bottom:8px;">
+      <div>
+        <h2 class="panel-title" style="font-size:1.05rem;">🔍 Filtros de Búsqueda</h2>
+        <p class="panel-sub">Filtra eventos por tipo de acción, entidad, usuario responsable o rango de fechas</p>
+      </div>
+      <div>
+        <button class="ghost btn-sm" id="btn-limpiar-filtros" type="button" style="font-size:0.75rem;">Limpiar Filtros</button>
+      </div>
+    </div>
+
+    <form id="form-filtros" class="filter-grid" novalidate>
+      <div class="filter-group">
+        <label for="filtro-texto">Búsqueda rápida</label>
+        <input type="search" id="filtro-texto" placeholder="Buscar en detalle o acción…">
+      </div>
+      <div class="filter-group">
+        <label for="filtro-entidad">Entidad afectada</label>
+        <select id="filtro-entidad">
+          <option value="">Todas las entidades</option>
+          <option value="servicio_usuario">Permisos de Servicio</option>
+          <option value="empleado">Usuarios y Admins</option>
+          <option value="dispositivo">Dispositivos de Red</option>
+          <option value="sede">Sedes</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="filtro-actor">Usuario responsable</label>
+        <input type="text" id="filtro-actor" placeholder="Ej: admin">
+      </div>
+      <div class="filter-group">
+        <label for="filtro-desde">Fecha Desde</label>
+        <input type="date" id="filtro-desde">
+      </div>
+      <div class="filter-group">
+        <label for="filtro-hasta">Fecha Hasta</label>
+        <input type="date" id="filtro-hasta">
+      </div>
+    </form>
+  </section>
+
+  <!-- Métricas Rápidas y Resumen de Almacenamiento en Carpeta de Logs -->
+  <section class="kpis" aria-label="Métricas de auditoría">
+    <article class="kpi"><span>Total Eventos</span><b id="kpi-total-logs">0</b></article>
+    <article class="kpi ok-k"><span>Permisos & Accesos</span><b id="kpi-permisos">0</b></article>
+    <article class="kpi warn-k"><span>Dispositivos</span><b id="kpi-dispositivos">0</b></article>
+    <article class="kpi down-k"><span>Deshabilitaciones</span><b id="kpi-desactivados">0</b></article>
+  </section>
+
+  <!-- Tabla Principal de Logs -->
+  <section class="card panel" aria-label="Tabla de eventos de auditoría">
+    <div class="panel-head-row">
+      <div>
+        <h2 class="panel-title">📜 Registro Histórico</h2>
+        <p class="panel-sub" id="subtitulo-contador">Mostrando los registros más recientes</p>
+      </div>
+      <div>
+        <span class="pill up" id="badge-logs-count">0 eventos</span>
+      </div>
+    </div>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 60px;">ID</th>
+            <th style="width: 140px;">Fecha y Hora</th>
+            <th style="width: 180px;">Acción Realizada</th>
+            <th style="width: 110px;">Entidad</th>
+            <th style="width: 120px;">Responsable</th>
+            <th style="width: 100px;">IP Origen</th>
+            <th>Detalle Completo del Evento</th>
+          </tr>
+        </thead>
+        <tbody id="rows-logs"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="empty-logs" hidden>No se encontraron registros de auditoría que coincidan con los filtros seleccionados.</p>
+  </section>
+
+  <!-- Información de la Carpeta de Logs en el Servidor -->
+  <section class="card panel" style="margin-top:20px; padding:16px;">
+    <h3 style="margin:0 0 6px 0; font-size:1rem;">📂 Archivos de Persistencia en Servidor (Carpeta <code>logs/</code>)</h3>
+    <p class="panel-sub" style="margin-bottom:10px;">Los eventos se escriben tanto en base de datos como en archivos rotativos y JSON Lines dentro de la carpeta física de logs.</p>
+    <div id="lista-archivos-logs" style="font-size:0.82rem; font-family:monospace; line-height:1.6; opacity:0.85;">Cargando archivos del servidor…</div>
+  </section>
+</main>
+
+<script type="module" src="logs.js"></script>
+</body>
+</html>

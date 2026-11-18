@@ -46,7 +46,7 @@ def _contactoFormalizado(id_usuario: int, id_contacto: int, db: Session) -> bool
 
 
 def _tieneServicioChat(emp: Empleado, id_sede: int | None, db: Session) -> bool:
-    if obtenerTipoAdmin(emp) == "admin-g":
+    if obtenerTipoAdmin(emp) in ("admin-g", "admin-s"):
         return True
 
     stmt = select(ServicioUsuario).where(
@@ -74,11 +74,12 @@ def _obtenerConversacion(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario destinatario no encontrado o inactivo.")
 
     tipo_admin = obtenerTipoAdmin(user)
+    tipo_dest = obtenerTipoAdmin(dest)
     sede_user = _obtenerSedeUsuario(user, db)
     sede_dest = _obtenerSedeUsuario(dest, db)
 
-    if tipo_admin == "admin-g":
-        id_sede_comun = sede_dest or sede_user
+    if tipo_admin == "admin-g" or tipo_dest == "admin-g":
+        id_sede_comun = sede_dest or sede_user or 1
     else:
         if sede_user is None or sede_dest is None or sede_user != sede_dest:
             raise HTTPException(
@@ -151,11 +152,12 @@ def _enviarMensaje(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El destinatario no existe o está inactivo.")
 
     tipo_admin = obtenerTipoAdmin(user)
+    tipo_dest = obtenerTipoAdmin(dest)
     sede_user = _obtenerSedeUsuario(user, db)
     sede_dest = _obtenerSedeUsuario(dest, db)
 
-    if tipo_admin == "admin-g":
-        id_sede_comun = sede_dest or sede_user
+    if tipo_admin == "admin-g" or tipo_dest == "admin-g":
+        id_sede_comun = sede_dest or sede_user or 1
     else:
         if sede_user is None or sede_dest is None or sede_user != sede_dest:
             raise HTTPException(

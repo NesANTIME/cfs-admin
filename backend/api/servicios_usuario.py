@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 from config.utils.request import UsuarioSedeResponse
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 from core.deps import getCurrentUser, requireAdmin, obtenerTipoAdmin
+from core.audit import registrar_log
 from db.template.empleado import Empleado, Tecnico, TecnicoJefe, UsuarioSede
 from db.template.servicio_usuario import ServicioUsuario, TIPOS_SERVICIO_USUARIO
 
@@ -166,6 +167,15 @@ def _habilitarServicio(
         registro.habilitado = True
         registro.id_sede = id_sede
 
+    registrar_log(
+        db,
+        accion=f"PERMISO_{tipo_servicio.upper()}_HABILITADO",
+        entidad="servicio_usuario",
+        id_entidad=id_empleado,
+        detalle=f"Servicio '{tipo_servicio}' HABILITADO para empleado #{id_empleado} ({objetivo.usuario}) en sede #{id_sede}.",
+        actor=user,
+    )
+
     db.commit()
     return {"detalle": f"Servicio '{tipo_servicio}' habilitado para el empleado {id_empleado}."}
 
@@ -217,6 +227,15 @@ def _deshabilitarServicio(
     else:
         registro.habilitado = False
         registro.id_sede = id_sede
+
+    registrar_log(
+        db,
+        accion=f"PERMISO_{tipo_servicio.upper()}_DESHABILITADO",
+        entidad="servicio_usuario",
+        id_entidad=id_empleado,
+        detalle=f"Servicio '{tipo_servicio}' DESHABILITADO para empleado #{id_empleado} ({objetivo.usuario}) en sede #{id_sede}.",
+        actor=user,
+    )
 
     db.commit()
     return {"detalle": f"Servicio '{tipo_servicio}' deshabilitado para el empleado {id_empleado}."}

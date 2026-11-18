@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from db.template.empleado import Empleado, Tecnico
 from fastapi import APIRouter, Depends, HTTPException, status
 from core.deps import getCurrentUser, requireAdminG, obtenerTipoAdmin
+from core.audit import registrar_log
 from config.utils.request import SedeCreate, SedeResponse, SedeDetalleResponse, SedeTecnicoUpdate, AdminSedeInfo
 
 
@@ -132,6 +133,14 @@ def _crearSede(
         id_tecnico_jefe = admin.id_empleado if admin.tipo == "tecnico_jefe" else None,
     )
     db.add(nueva_sede)
+    registrar_log(
+        db,
+        accion="SEDE_CREADA",
+        entidad="sede",
+        id_entidad=nueva_sede.id_sede,
+        detalle=f"Sede '{nueva_sede.nombre}' registrada en '{nueva_sede.ubicacion}' por {admin.usuario}.",
+        actor=admin,
+    )
     db.commit()
     db.refresh(nueva_sede)
     return _construirSedeResponse(nueva_sede, db)
@@ -181,6 +190,15 @@ def _asignarTecnicoSede(
         ).all()
         for t in tecnicos_sede:
             t.id_sede = None
+
+    registrar_log(
+        db,
+        accion="ADMIN_S_ASIGNACION_SEDE",
+        entidad="sede",
+        id_entidad=id_sede,
+        detalle=f"Actualización de Admin-S para sede #{id_sede}: técnico #{data.id_empleado} asignado por {admin.usuario}.",
+        actor=admin,
+    )
 
     db.commit()
     db.refresh(sede)

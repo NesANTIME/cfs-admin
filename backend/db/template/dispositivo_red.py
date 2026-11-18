@@ -1,9 +1,10 @@
 from .base import Base
 from typing import TYPE_CHECKING
+from datetime import datetime
 from .servicio_red import dispositivo_servicio
 from sqlalchemy.dialects.postgresql import INET, MACADDR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import CheckConstraint, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, Text, UniqueConstraint
 
 if (TYPE_CHECKING):
     from .sede import Sede
@@ -22,7 +23,14 @@ class DispositivoRed(Base):
     mac: Mapped[str] = mapped_column(MACADDR, unique = True)
     tipo: Mapped[str] = mapped_column(String(50))
     estado: Mapped[str] = mapped_column(String(20), default = "desconocido", server_default = "desconocido")
+    descripcion: Mapped[str | None] = mapped_column(Text, nullable = True)
 
+    # Campos sistema UID y vinculación con app cliente
+    uid_dispositivo: Mapped[str | None] = mapped_column(String(128), unique = True, nullable = True)
+    contrasena_hash: Mapped[str | None] = mapped_column(String(255), nullable = True)
+    vinculado: Mapped[bool] = mapped_column(Boolean, default = False, server_default = "false")
+    ultimo_ping: Mapped[datetime | None] = mapped_column(DateTime(timezone = True), nullable = True)
+    detalles_hardware: Mapped[str | None] = mapped_column(Text, nullable = True)
 
     id_sede: Mapped[int] = mapped_column(ForeignKey("sedes.id_sede", ondelete = "CASCADE"))
     sede: Mapped["Sede"] = relationship(back_populates = "dispositivos")
