@@ -1,0 +1,59 @@
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: DockerFile
+    container_name: cfcs-api
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      RED__HOST: "0.0.0.0"
+      RED__PORT: "${RED__PORT:-8000}"
+      RED__TRUSTED_PROXIES: "${RED__TRUSTED_PROXIES:-172.28.0.10}"
+      DATABASE__HOST: "${DATABASE__HOST}"
+      DATABASE__PORT: "${DATABASE__PORT:-5432}"
+      DATABASE__USER: "${DATABASE__USER}"
+      DATABASE__PASSWORD: "${DATABASE__PASSWORD}"
+      DATABASE__DB: "${DATABASE__DB}"
+      DATABASE__SQLECHO: "${DATABASE__SQLECHO:-false}"
+      JWT__SECRET_KEY: "${JWT__SECRET_KEY:-cfcs_secret_key_super_segura_para_desarrollo_2026_xyz}"
+      JWT__ALGORITHM: "${JWT__ALGORITHM:-HS256}"
+      JWT__ACCESS_TOKEN: "${JWT__ACCESS_TOKEN:-15}"
+      JWT__REFRESH_TOKEN: "${JWT__REFRESH_TOKEN:-7}"
+      CORS__ALLOW_ORIGINS: '${CORS__ALLOW_ORIGINS:-["http://localhost:3000","http://localhost:5173","http://localhost:8080"]}'
+      CORS__ALLOW_METHODS: '${CORS__ALLOW_METHODS:-["GET","POST","PATCH","DELETE","OPTIONS"]}'
+      CORS__ALLOW_HEADERS: '${CORS__ALLOW_HEADERS:-["Content-Type","Authorization"]}'
+      CORS__ALLOW_CREDENTIALS: "${CORS__ALLOW_CREDENTIALS:-false}"
+      VIDEOCONFERENCIA__INVITACION: "${VIDEOCONFERENCIA__INVITACION:-2}"
+      VIDEOCONFERENCIA__STUN_URLS: '${VIDEOCONFERENCIA__STUN_URLS:-["stun:stun.l.google.com:19302","stun:stun1.l.google.com:19302"]}'
+      ADMIN_DEFAULT_PASSWORD: "${ADMIN_DEFAULT_PASSWORD:-admincfs}"
+    command: >
+      sh -c "python -c 'from db.controller import MigrateDatabase; MigrateDatabase(); from db.admin import asegurarAdminPredeterminado; asegurarAdminPredeterminado()' && python cfcs-core.py"
+    expose:
+      - "8000"
+    networks:
+      - cfcs_network
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/DockerFile
+    container_name: cfcs-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${PORT_WEB:-8080}:80"
+    networks:
+      cfcs_network:
+        ipv4_address: 172.28.0.10
+
+networks:
+  cfcs_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
